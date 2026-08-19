@@ -14,7 +14,10 @@
 | **BUG-004** | Termux Shell | `start-server.sh: ip: command not found` | ✅ Đã khắc phục | 2026-08-19 |
 | **BUG-005** | Web UI Responsive | Giao diện bị bung chiều ngang trên màn hình điện thoại | ✅ Đã khắc phục | 2026-08-19 |
 | **BUG-006** | EPUB Download UX | Nút Tải EPUB không phản hồi do thiếu loading feedback | ✅ Đã khắc phục | 2026-08-19 |
+| **BUG-007** | OPDS UI Layout | Tiêu đề chương trên màn hình e-ink X3 bị tràn & cắt thành `...` | ✅ Đã khắc phục | 2026-08-19 |
+| **BUG-008** | Native Simulator | Biên dịch GCC 15 trên Linux/WSL gặp lỗi narrowing, C23 bool | ✅ Đã khắc phục | 2026-08-19 |
 | **DEPLOY-001** | Môi trường Android | Cài đặt toàn bộ 26 packages (FastAPI, EbookLib, Zeroconf...) | 🟢 Hoàn tất 100% | 2026-08-19 |
+| **RULE-001** | Firmware Integrity | Tuyệt đối tuân thủ 100% Stock Factory Firmware của Xteink X3 | 🟢 Tuân thủ 100% | 2026-08-19 |
 
 ---
 
@@ -176,6 +179,27 @@
   2. **Lock in Recent Apps**: Khóa biểu tượng ổ khóa 🔒 cho Termux trong màn hình đa nhiệm.
   3. **Battery Unrestricted**: Chuyển chế độ quản lý pin của Termux sang "Không giới hạn".
   4. **Uvicorn Keep-Alive**: Cấu hình `--timeout-keep-alive 75 --limit-concurrency 100` để giữ luồng socket luôn sẵn sàng.
+
+### 11. BUG-009: Tràn và Cắt Tiêu Đề Chương Thành `...` Trên Màn Hình E-ink X3 (792px)
+- **Triệu chứng**: Khi mở danh sách chương trên máy ảo / máy thật X3, các dòng chương bị cắt chữ thành dạng `Vô Địch Thiên Đế — Chương 1: Thiên Đ...`, người đọc không nhìn thấy được tên chương đầy đủ.
+- **Nguyên nhân**: Màn hình Xteink X3 có độ phân giải ngang 792px. Nếu đưa chuỗi `{Tên truyện} — Chương {X}: {Tên chương}` vào thẻ `<title>` của Atom OPDS feed, chiều dài vượt quá bề rộng màn hình và firmware CrossPoint tự động cắt ngắn bằng dấu chấm lửng `...`.
+- **Khắc phục**:
+  1. Trong `opds_builder.py` (`build_book_chapters_feed`), tách biệt hoàn toàn:
+     - Thẻ `<title>`: Chỉ chứa tên chương sạch gọn (`Chương X: Tên Chương`).
+     - Thẻ `<author>`: Chứa tên truyện (`{Tên Truyện}`).
+  2. Firmware CrossPoint sẽ tự động hiển thị Dòng 1 (in đậm, to) là Tên chương đầy đủ, và Dòng 2 (nhỏ bên dưới) là Tên truyện, tạo bố cục cân đối và không bao giờ bị cắt chữ.
+
+### 12. BUG-010: Xung Đột GCC 15 / C23 Khi Biên Dịch Native CrossPoint Simulator Trên WSL
+- **Triệu chứng**: Khi build máy ảo `simulator_x3` trên Ubuntu 24.04/Debian (GCC 15), trình biên dịch báo lỗi narrowing conversion (`[-Wnarrowing]`), lỗi C23 bool keyword trong `QRCode/qrcode.h`, và thiếu `memcpy_P` trong `AnimatedGIF`.
+- **Khắc phục**:
+  1. Thêm cờ `-Wno-narrowing` và `-Dmemcpy_P=memcpy` vào `platformio.local.ini`.
+  2. Bọc `typedef unsigned char bool;` trong `QRCode` bằng điều kiện kiểm tra phiên bản chuẩn C23 (`__STDC_VERSION__ < 202311L`).
+  3. Bổ sung các stub tương thích (`IDLE_POWER_SAVING_MS`, `combinesGrayscaleBase`) trong thư viện giả lập phần cứng `crosspoint-simulator`.
+
+### 13. RULE-001: Nguyên Tắc Bất Di Bất Dịch — Giữ 100% Stock Factory Firmware
+- **Quy tắc**: Tuyệt đối **KHÔNG** chỉnh sửa hoặc can thiệp vào mã nguồn firmware gốc của CrossPoint Reader / Xteink X3 để đạt được mục đích.
+- **Lý do**: Máy đọc sách Xteink X3 vật lý ngoài đời chạy firmware gốc xuất xưởng của nhà sản xuất (hoặc bản flash release chính thức). Người dùng không thể và không nên tùy tiện flash custom firmware vì rủi ro brick máy cao.
+- **Giải pháp chuẩn**: Mọi tính năng (danh sách chương, tiếp tục đọc, phân loại danh mục, ảnh bìa, gom tập KOSync) phải được hiện thực hoàn toàn 100% phía **Backend Server OPDS** theo đúng đặc tả Atom / OPDS 1.2 RFC.
 
 ---
 

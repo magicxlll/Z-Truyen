@@ -1,4 +1,4 @@
-# Python
+# Python & Bytecode
 __pycache__/
 *.py[cod]
 *$py.class
@@ -27,7 +27,7 @@ ENV/
 env/
 .ztruyen-venv/
 
-# Pytest / Cache
+# Pytest / Coverage / Caches
 .pytest_cache/
 .coverage
 htmlcov/
@@ -41,18 +41,23 @@ backend/data/*.db-shm
 data/cache/
 data/*.db
 
-# IDE & Internal
+# IDE & AI Assistant files
 .agents/
+.claude/
+.specify/
 .gemini/
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Environment variables
+# Environment variables & Logs
 .env
 .env.local
+*.log
+task-*-report.md
 
-# Package archives
-ztruyen-android.zip
+# Package archives & Temporary files
+*.zip
 *.tar.gz
+*.koplugin
