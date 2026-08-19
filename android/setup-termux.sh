@@ -31,14 +31,18 @@ PROJECT_ROOT="$(dirname "$DIR")"
 cd "$PROJECT_ROOT/backend"
 pip install -r "$DIR/requirements-termux.txt"
 
-# 4. Tạo alias 'ztruyen' để khởi động nhanh mọi lúc
+# 4. Tạo alias 'ztruyen' và 'ztruyen-update' để khởi động và cập nhật nhanh
 echo ""
-echo "[4/4] Đang tạo phím tắt lệnh 'ztruyen'..."
+echo "[4/4] Đang tạo phím tắt lệnh 'ztruyen' và 'ztruyen-update'..."
 START_SCRIPT="$DIR/start-server.sh"
 chmod +x "$START_SCRIPT"
 
 if ! grep -q "alias ztruyen=" ~/.bashrc 2>/dev/null; then
     echo "alias ztruyen='$START_SCRIPT'" >> ~/.bashrc
+fi
+
+if ! grep -q "alias ztruyen-update=" ~/.bashrc 2>/dev/null; then
+    echo "alias ztruyen-update='cd ~/ztruyen && git pull && $START_SCRIPT'" >> ~/.bashrc
 fi
 
 echo ""
