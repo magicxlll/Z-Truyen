@@ -24,27 +24,60 @@ if [ -z "$HOST_IP" ]; then
     HOST_IP="127.0.0.1"
 fi
 
-# Write OPDS servers config for CrossPoint
+# Write OPDS servers config for CrossPoint (including Android Phone IPs & PC Localhost)
 cat > fs_/.crosspoint/opds.json << EOF
 {
   "servers": [
     {
-      "name": "Z-Truyen (Localhost)",
+      "name": "Android Termux (192.168.1.22)",
+      "url": "http://192.168.1.22:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "Android Termux (192.168.1.32)",
+      "url": "http://192.168.1.32:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "Android Termux (10.176.38.219)",
+      "url": "http://10.176.38.219:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "Android Hotspot (192.168.43.1)",
+      "url": "http://192.168.43.1:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "PC Localhost (127.0.0.1)",
       "url": "http://127.0.0.1:8080/opds",
       "username": "",
       "password_obf": ""
     },
     {
-      "name": "Z-Truyen (WSL Gateway)",
+      "name": "PC WSL Gateway",
       "url": "http://${HOST_IP}:8080/opds",
       "username": "",
       "password_obf": ""
-    },
+    }
+  ]
+}
+EOF
+
+# Pre-save Wi-Fi credentials so simulator is always auto-connected
+cat > fs_/.crosspoint/wifi.json << EOF
+{
+  "lastConnectedSsid": "Simulator WiFi (fake)",
+  "credentials": [
     {
-      "name": "Z-Truyen (Android Hotspot)",
-      "url": "http://192.168.43.1:8080/opds",
-      "username": "",
-      "password_obf": ""
+      "ssid": "Simulator WiFi (fake)",
+      "password_obf": "",
+      "password_len": 0,
+      "password_crc32": 0
     }
   ]
 }
@@ -54,18 +87,19 @@ echo "======================================================"
 echo "    CROSSPOINT READER - XTEINK X3 DESKTOP EMULATOR    "
 echo "======================================================"
 echo " [!] Device Profile: Xteink X3 (792x528 E-ink Framebuffer)"
-echo " [!] Phim dieu khien (Controls):"
-echo "     - Phim Mui ten: Dieu huong / Lat trang sach"
-echo "     - Enter / Space: Chon / Mo sach / Xac nhan (OK)"
-echo "     - ESC / Backspace: Quay lai (Back)"
-echo "     - Chuot trai: Cam ung man hinh (Touch/Click)"
-echo "     - Phim P: Nut Nguon / Khoa may (Power / Sleep)"
-echo " [!] OPDS Server: http://127.0.0.1:8080/opds (Z-Truyen)"
+echo " [!] Wi-Fi ảo: Tự động kết nối LAN (Auto-Connected)"
+echo " [!] Phím điều khiển (Controls):"
+echo "     - Phím Mũi tên: Điều hướng / Lật trang sách"
+echo "     - Enter / Space: Chọn / Mở sách / Xác nhận (OK)"
+echo "     - ESC / Backspace: Quay lại (Back)"
+echo "     - Chuột trái: Cảm ứng màn hình (Touch/Click)"
+echo "     - Phím P: Nút Nguồn / Khóa máy (Power / Sleep)"
+echo " [!] Kết nối Termux Android: http://192.168.1.22:8080/opds"
 echo "======================================================"
 echo ""
 
 if [ ! -f .pio/build/simulator_x3/program ]; then
-    echo "[*] Dang bien dich firmware X3 Simulator lan dau..."
+    echo "[*] Dang bien dich firmware X3 Simulator..."
     pio run -e simulator_x3
 fi
 
