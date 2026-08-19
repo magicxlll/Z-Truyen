@@ -67,7 +67,11 @@ async def get_opds_book_detail(
     """Return story detail feed with multiple acquisition options: Single-chapter, Volumes, Full story."""
     story = await _get_cached_story(source_id, book_slug)
 
-    total_chapters = story.total_chapters or 1
+    total_chapters = story.total_chapters or 0
+    if total_chapters <= 1:
+        all_chaps = await _get_cached_chapters(source_id, book_slug)
+        total_chapters = len(all_chaps) if all_chaps else 1
+
     volume_slices = volume_bundler.calculate_volume_slices(total_chapters=total_chapters)
 
     base_url = str(request.base_url).rstrip("/")
@@ -90,7 +94,10 @@ async def get_opds_book_chapters(
 ) -> Response:
     """Return individual chapters feed with range groups / pagination support for X3."""
     story = await _get_cached_story(source_id, book_slug)
-    total_chapters = story.total_chapters or 1
+    total_chapters = story.total_chapters or 0
+    if total_chapters <= 1 and start is None:
+        all_chaps = await _get_cached_chapters(source_id, book_slug)
+        total_chapters = len(all_chaps) if all_chaps else 1
     base_url = str(request.base_url).rstrip("/")
 
     # If no specific range requested and story has > 50 chapters, return Range Selection Screen instantly

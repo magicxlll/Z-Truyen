@@ -60,6 +60,7 @@ class AkayTruyenAdapter:
             if img and not title:
                 title = img.attributes.get("alt", "")
 
+            title = re.sub(r"(?:Đang\s*viết|Hoàn\s*thành|Full|Hot|New|VIP)+$", "", title, flags=re.IGNORECASE).strip()
             title = re.sub(r"\s+(Full|Hot|New|Đang viết)\s*$", "", title, flags=re.IGNORECASE).strip()
 
             if slug in stories_map:
@@ -143,7 +144,8 @@ class AkayTruyenAdapter:
         tree = HTMLParser(resp.text)
 
         title_node = tree.css_first("h1, .story-title, .title-story")
-        title = title_node.text(strip=True) if title_node else story_slug
+        raw_title = title_node.text(strip=True) if title_node else story_slug
+        title = re.sub(r"(?:Đang\s*viết|Hoàn\s*thành|Full|Hot|New|VIP)+$", "", raw_title, flags=re.IGNORECASE).strip()
 
         desc_node = tree.css_first(".desc, [itemprop='description'], .story-description")
         desc = desc_node.text(strip=True) if desc_node else ""
@@ -160,6 +162,23 @@ class AkayTruyenAdapter:
 
         genres = [a.text(strip=True) for a in tree.css("a[href*='/the-loai/']") if a.text(strip=True)]
 
+        # Extract total chapters from chapter list and pagination
+        total_chapters = 0
+        for a in tree.css(f"a[href*='/{story_slug}/']"):
+            href = a.attributes.get("href", "")
+            m = re.search(r"chuong-(\d+)", href)
+            if m:
+                total_chapters = max(total_chapters, int(m.group(1)))
+
+        max_page = 1
+        for p in tree.css(".pagination a, .page-item a, a[href*='page=']"):
+            t = p.text(strip=True)
+            if t.isdigit():
+                max_page = max(max_page, int(t))
+
+        if max_page > 1 and total_chapters == 0:
+            total_chapters = max_page * 50
+
         return Story(
             id=build_story_id(self.id, story_slug),
             source_id=self.id,
@@ -170,6 +189,7 @@ class AkayTruyenAdapter:
             cover_url=cover_url,
             status="Đang cập nhật",
             genres=genres,
+            total_chapters=total_chapters,
         )
 
     async def list_chapters(
