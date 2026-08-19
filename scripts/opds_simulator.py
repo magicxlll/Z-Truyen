@@ -231,11 +231,22 @@ class OpdsSimulator:
 
 def main():
     parser = argparse.ArgumentParser(description="Z-Truyen X3 OPDS Device Simulator")
-    parser.add_argument("--url", default="http://localhost:8080", help="Base URL of Z-Truyen Backend (default: http://localhost:8080)")
+    parser.add_argument("--url", default="", help="Base URL of Z-Truyen Backend")
     args = parser.parse_args()
 
     print_banner()
-    sim = OpdsSimulator(base_url=args.url)
+
+    target_url = args.url.strip()
+    if not target_url:
+        print("\n🌐 CẤU HÌNH KẾT NỐI MÁY CHỦ:")
+        print("   - Nếu Server đang chạy trên Điện thoại phát Hotspot: Nhập http://192.168.43.1:8080")
+        print("   - Nếu Server đang chạy trên Điện thoại cùng Wi-Fi: Nhập IP điện thoại (VD: http://192.168.1.5:8080)")
+        print("   - Nếu chạy Backend ngay trên máy tính: Bấm ENTER để dùng mặc định [http://localhost:8080]")
+        print("-" * 65)
+        user_in = input("\n👉 Nhập URL Server (bấm Enter để dùng http://localhost:8080): ").strip()
+        target_url = user_in if user_in else "http://localhost:8080"
+
+    sim = OpdsSimulator(base_url=target_url)
     sim.run_menu()
 
 
