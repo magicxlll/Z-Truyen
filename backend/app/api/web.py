@@ -827,40 +827,43 @@ WEB_HTML = """<!DOCTYPE html>
             const modalContent = document.getElementById('modal-content');
             
             modalTitle.innerText = title;
-            modalContent.innerHTML = '<div class="loading">Đang tải danh sách chương từ ' + source + '...</div>';
+            modalContent.innerHTML = '<div class="loading">Đang nạp danh sách chương từ ' + source + '...</div>';
             modal.style.display = 'flex';
             currentTab = 'chapters';
             currentSort = 'asc';
+            cachedStoryVolumes = null;
             document.getElementById('tab-btn-chapters').classList.add('active');
             document.getElementById('tab-btn-volumes').classList.remove('active');
 
             try {
-                // Fetch JSON chapter list
-                const res = await fetch('/opds/api/book/' + source + '/' + slug);
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                currentStoryData = await res.json();
-                currentStoryData.source_id = source;
-                currentStoryData.slug = slug;
-                renderChaptersTab();
-                
-                // Prefetch volume feed in background for Tab 2
-                fetchVolumeFeed(source, slug);
+                // Fetch JSON chapter list and XML volume feed concurrently
+                const [jsonRes, xmlRes] = await Promise.allSettled([
+                    fetch('/opds/api/book/' + source + '/' + slug),
+                    fetch('/opds/book/' + source + '/' + slug)
+                ]);
+
+                if (xmlRes.status === 'fulfilled' && xmlRes.value.ok) {
+                    cachedStoryVolumes = await xmlRes.value.text();
+                }
+
+                if (jsonRes.status === 'fulfilled' && jsonRes.value.ok) {
+                    currentStoryData = await jsonRes.value.json();
+                    currentStoryData.source_id = source;
+                    currentStoryData.slug = slug;
+                    renderChaptersTab();
+                } else if (cachedStoryVolumes) {
+                    // Fallback to volumes if json chapters fail
+                    currentStoryData = { source_id: source, slug: slug };
+                    switchTab('volumes');
+                } else {
+                    throw new Error('Không thể nạp dữ liệu từ nguồn ' + source);
+                }
             } catch (err) {
                 modalContent.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 2rem 0;">Lỗi tải dữ liệu: ' + err.message + '</p>';
             }
         }
 
-        async function fetchVolumeFeed(source, slug) {
-            try {
-                const res = await fetch('/opds/book/' + source + '/' + slug);
-                if (res.ok) {
-                    const text = await res.text();
-                    cachedStoryVolumes = text;
-                }
-            } catch (_) {}
-        }
-
-        function switchTab(tab) {
+        async function switchTab(tab) {
             currentTab = tab;
             if (tab === 'chapters') {
                 document.getElementById('tab-btn-chapters').classList.add('active');
@@ -869,7 +872,7 @@ WEB_HTML = """<!DOCTYPE html>
             } else {
                 document.getElementById('tab-btn-chapters').classList.remove('active');
                 document.getElementById('tab-btn-volumes').classList.add('active');
-                renderVolumesTab();
+                await renderVolumesTab();
             }
         }
 
@@ -892,7 +895,11 @@ WEB_HTML = """<!DOCTYPE html>
         }
 
         function renderChaptersTab() {
-            if (!currentStoryData || !currentStoryData.chapters) return;
+            if (!currentStoryData || !currentStoryData.chapters) {
+                const modalContent = document.getElementById('modal-content');
+                modalContent.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">Chưa có dữ liệu từng chương. Bạn có thể xem tab Gom Tập (50 chương).</p>';
+                return;
+            }
             const modalContent = document.getElementById('modal-content');
             
             let chapters = [...currentStoryData.chapters];
@@ -930,10 +937,20 @@ WEB_HTML = """<!DOCTYPE html>
             modalContent.innerHTML = html;
         }
 
-        function renderVolumesTab() {
+        async function renderVolumesTab() {
             const modalContent = document.getElementById('modal-content');
+            if (!cachedStoryVolumes && currentStoryData) {
+                modalContent.innerHTML = '<div class="loading">Đang nạp danh sách tập 50 chương...</div>';
+                try {
+                    const res = await fetch('/opds/book/' + currentStoryData.source_id + '/' + currentStoryData.slug);
+                    if (res.ok) {
+                        cachedStoryVolumes = await res.text();
+                    }
+                } catch (_) {}
+            }
+
             if (!cachedStoryVolumes) {
-                modalContent.innerHTML = '<div class="loading">Đang tải danh sách tập 50 chương...</div>';
+                modalContent.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 2rem 0;">Không tìm thấy danh sách tập 50 chương.</p>';
                 return;
             }
 

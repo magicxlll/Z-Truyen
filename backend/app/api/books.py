@@ -91,6 +91,7 @@ async def get_opds_book_chapters(
     return Response(content=xml, media_type=ATOM_XML_MEDIA_TYPE)
 
 
+@router.get("/api/book/{source_id}/{book_slug}")
 @router.get("/api/book/{source_id}/{book_slug}/chapters")
 async def get_json_book_chapters(
     source_id: str,
