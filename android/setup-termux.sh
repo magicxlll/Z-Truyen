@@ -42,7 +42,7 @@ if ! grep -q "alias ztruyen=" ~/.bashrc 2>/dev/null; then
 fi
 
 if ! grep -q "alias ztruyen-update=" ~/.bashrc 2>/dev/null; then
-    echo "alias ztruyen-update='cd ~/ztruyen && git pull && $START_SCRIPT'" >> ~/.bashrc
+    echo "alias ztruyen-update='cd ~/ztruyen && git fetch origin main && git reset --hard origin/main && $START_SCRIPT'" >> ~/.bashrc
 fi
 
 echo ""
