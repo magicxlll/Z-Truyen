@@ -26,12 +26,14 @@ async def get_opds_book(
     try:
         story = await adapter.get_story_detail(book_slug)
         repo.upsert_story(story)
+        repo.set_last_read(source_id, book_slug, story.title, 1)
     except Exception as e:
         logger.error(f"Failed to fetch story details ({source_id}:{book_slug}): {e}")
         # Try local cache
         cached_story = repo.get_story(source_id, book_slug)
         if cached_story:
             story = cached_story
+            repo.set_last_read(source_id, book_slug, story.title, 1)
         else:
             raise HTTPException(status_code=502, detail=f"Could not load story from source: {e}")
 
@@ -72,6 +74,7 @@ async def get_opds_book_chapters(
     try:
         story = await adapter.get_story_detail(book_slug)
         all_chapters = await adapter.get_all_chapters(book_slug)
+        repo.set_last_read(source_id, book_slug, story.title, 1)
     except Exception as e:
         logger.error(f"Failed to fetch chapters for ({source_id}:{book_slug}): {e}")
         raise HTTPException(status_code=502, detail=f"Could not load chapters: {e}")

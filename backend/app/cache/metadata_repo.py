@@ -370,5 +370,53 @@ class MetadataRepository:
                 last_login_at=last_login,
             )
 
+    # --- Last Read / Continue Reading ---
+    def set_last_read(
+        self, source_id: str, story_slug: str, story_title: str, chap_order: int = 1
+    ) -> None:
+        now_str = datetime.now().isoformat()
+        with get_connection(self.db_path) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS last_read (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    source_id TEXT NOT NULL,
+                    story_slug TEXT NOT NULL,
+                    story_title TEXT NOT NULL,
+                    chap_order INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO last_read (id, source_id, story_slug, story_title, chap_order, updated_at)
+                VALUES (1, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    source_id=excluded.source_id,
+                    story_slug=excluded.story_slug,
+                    story_title=excluded.story_title,
+                    chap_order=excluded.chap_order,
+                    updated_at=excluded.updated_at
+                """,
+                (source_id, story_slug, story_title, chap_order, now_str),
+            )
+
+    def get_last_read(self) -> dict[str, Any] | None:
+        with get_connection(self.db_path) as conn:
+            try:
+                row = conn.execute("SELECT * FROM last_read WHERE id = 1").fetchone()
+                if not row:
+                    return None
+                return {
+                    "source_id": row["source_id"],
+                    "story_slug": row["story_slug"],
+                    "story_title": row["story_title"],
+                    "chap_order": row["chap_order"],
+                    "updated_at": row["updated_at"],
+                }
+            except Exception:
+                return None
+
 
 repo = MetadataRepository()

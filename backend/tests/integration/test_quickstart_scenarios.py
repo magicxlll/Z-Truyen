@@ -104,7 +104,7 @@ async def test_scenario_2_opds_root_feed() -> None:
         assert res.status_code == 200
         assert "application/atom+xml" in res.headers["content-type"]
         assert "🔥 Truyện Hot &amp; Đọc Nhiều" in res.text
-        assert "⚡ Mới Cập Nhật" in res.text
+        assert "⚡ Truyện Mới Cập Nhật" in res.text
         assert "search?q={searchTerms}" in res.text
 
 

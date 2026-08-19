@@ -17,10 +17,15 @@ ATOM_XML_MEDIA_TYPE = "application/atom+xml;profile=opds-catalog"
 
 @router.get("", response_class=Response)
 @router.get("/", response_class=Response)
-async def get_opds_root(request: Request) -> Response:
+async def get_opds_root(request: Request, source: str | None = None) -> Response:
     """Return the root OPDS 1.2 navigation feed for Xteink X3 and KOReader."""
     base_url = str(request.base_url).rstrip("/")
-    xml = OpdsBuilder.build_root_feed(base_url=base_url)
+    last_read = repo.get_last_read()
+    xml = OpdsBuilder.build_root_feed(
+        last_read=last_read,
+        current_source_id=source,
+        base_url=base_url,
+    )
     return Response(content=xml, media_type=ATOM_XML_MEDIA_TYPE)
 
 

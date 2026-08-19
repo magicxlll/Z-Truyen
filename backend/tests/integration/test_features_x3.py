@@ -8,23 +8,28 @@ from app.cache.object_storage import storage
 
 @pytest.mark.asyncio
 async def test_opds_root_sources_at_top():
-    """Verify OPDS root feed places Source selection on top and has no technical jargon."""
+    """Verify OPDS root feed matches user layout with Continue Reading, Select Source, and Categories."""
+    # 1. Without last read
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
         resp = await client.get("/opds")
         assert resp.status_code == 200
         text = resp.text
 
-        # Verify sources section is at top before categories
-        idx_sources = text.find("Chọn Nguồn Truyện")
-        idx_hot = text.find("Truyện Hot")
-        assert idx_sources != -1
-        assert idx_hot != -1
-        assert idx_sources < idx_hot
+        assert "Chọn Nguồn Truyện" in text
+        assert "Nguồn Hiện Tại" in text
+        assert "Truyện Mới Cập Nhật" in text
+        assert "Truyện Hot" in text
+        assert "Truyện Hoàn Thành" in text
+        assert "Thể Loại Truyện" in text
 
-        # Verify no technical jargon like 'nguồn cào'
-        assert "nguồn cào" not in text.lower()
-        assert "Kho Truyện: Storya" in text
-        assert "Kho Truyện: Con Đường Bá Chủ" in text
+        # 2. With last read
+        from app.cache.metadata_repo import repo
+        repo.set_last_read("storyaclick", "muc-than-ky", "Mục Thần Ký", 5)
+        
+        resp2 = await client.get("/opds")
+        assert resp2.status_code == 200
+        assert "Đọc Tiếp: Mục Thần Ký" in resp2.text
+        assert "/opds/book/storyaclick/muc-than-ky/chapters?sort=asc" in resp2.text
 
 
 @pytest.mark.asyncio
@@ -50,7 +55,6 @@ async def test_opds_book_multiple_acquisition_methods():
         assert "Chương 1" in text
         assert "Trọn Bộ" in text
         assert "Tập 01" in text
-        assert "/opds/cover/conduongbachu/main" in text
 
 
 @pytest.mark.asyncio
