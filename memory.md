@@ -9,21 +9,26 @@
 
 ## 🚀 1. TRẠNG THÁI HIỆN TẠI (CURRENT PROJECT STATE)
 
-1. **Kiểm thử toàn diện**: **28/28 test cases PASS 100%** (`python -m pytest backend/tests -v`).
+1. **Kiểm thử toàn diện**: **33/33 test cases PASS 100%** (`python -m pytest backend/tests -v`).
 2. **Pocket Host Server trên Android (Termux)**:
    - Đã cài đặt và vận hành ổn định trên điện thoại Android thực tế (`aarch64`, Python 3.14).
    - Tích hợp lệnh khởi chạy `ztruyen` và lệnh tự động cập nhật code không xung đột `ztruyen-update` (`android/update.sh`).
    - Đã xử lý triệt để hiện tượng Android Doze Mode / Background Freezing thông qua cơ chế `Acquire wakelock` và `Battery Unrestricted`.
-3. **Cơ chế Đọc "Gần Như Online" (Near-Online Streaming Engine)**:
-   - **Tải tức thì 0.3s/chương**: Tạo file EPUB 1 chương siêu nhẹ (15 - 30KB).
-   - **Tải ngầm 3 chương tiếp theo (Background Prefetch)**: Tự động cào và nén sẵn chương $N+1, N+2, N+3$ vào cache ngầm khi người dùng đọc chương $N$.
-   - **Dọn dẹp bộ nhớ thông minh (Smart Cache)**: Tự động xóa các chương cũ hơn 5 chương phía trước ($< N - 5$) để không đầy bộ nhớ điện thoại.
-   - **Đa dạng hình thức tải**: Tải 1 chương lẻ (`32`), tải gom khoảng chương tùy chọn (`1-32`), tải trọn bộ (`ALL`), và tải tập gom sẵn 50 chương/tập.
-4. **Bộ lọc & Phân loại đa nguồn**:
-   - Chọn nguồn: `Tất cả nguồn`, `Storya.click`, `AkayTruyen`, `Con Đường Bá Chủ`.
-   - Bộ lọc danh mục: `🔥 Truyện Hot`, `⚡ Mới Cập Nhật`, `✅ Hoàn Thành (Full Trọn Bộ)`.
-   - Sắp xếp chương: `⬆️ Từ đầu (1 ➔ N)` $\leftrightarrow$ `⬇️ Mới nhất (N ➔ 1)`.
-5. **Máy ảo Xteink X3 Đồ họa Thật (CrossPoint Reader Native Virtual Machine trên WSL2/WSLg)**:
+3. **Cơ chế Đọc "Gần Như Online" & Nâng Cấp Giao Diện X3**:
+   - **Chọn Nguồn Truyện lên trên cùng**: Giao diện OPDS Root đưa `🌐 Chọn Nguồn Truyện` và danh sách từng kho truyện (`📚 Storya`, `🌟 AkayTruyen`, `⚔️ Con Đường Bá Chủ`) lên vị trí đầu tiên, loại bỏ các từ ngữ kỹ thuật như "nguồn cào".
+   - **Đa phương thức tải & Liệt kê toàn bộ chương**: Feed chi tiết sách cung cấp đầy đủ các tùy chọn:
+     - ⚡ *Đọc Từng Chương (1 ➔ N & N ➔ 1)*: Liệt kê toàn bộ danh sách chương để tải tức thì 0.3s/chương.
+     - 📖 *Đọc Ngay Chương 1*: Tải 1-click chương mở đầu.
+     - 📥 *Tải Trọn Bộ (Full ALL)*: Nén tất cả chương thành 1 file EPUB hoàn chỉnh.
+     - 📦 *Tập Gom Sẵn (50 chương/tập)*: Các tập phân đoạn tối ưu cho KOSync.
+   - **Tải ngầm thông minh & Hộp thoại Đọc Ngay (Y/N)**:
+     - Tải 1 chương $\rightarrow$ Tự động tải ngầm 3 chương tiếp theo và dọn dẹp 5 chương cũ phía trước.
+     - Web UI có thông báo tiến trình `⏳ Đang cào & nén...` và hộp thoại xác nhận `✅ Tải về hoàn tất! Bạn có muốn mở đọc ngay bây giờ không? [📖 Đọc Ngay] [✖ Để Sau]`.
+   - **Tự động tạo folder theo tên truyện**: Toàn bộ file EPUB tải về được tự động phân loại và lưu trong thư mục con riêng theo tên truyện (`downloads/{story_slug}/` và `data/epubs/{story_slug}/`).
+   - **Proxy tối ưu hóa bìa truyện cho E-ink**:
+     - Endpoint `/opds/cover/{source}/{slug}` tự động chuyển đổi định dạng ảnh (WebP, PNG $\rightarrow$ Standard JPEG), tương thích 100% với bộ giải mã `JPEGDEC` trên CrossPoint X3 và KOReader.
+     - Tự động tăng độ tương phản và căn chỉnh kích thước (240x360), giúp bìa truyện hiển thị sắc nét ở 16 mức xám E-ink.
+4. **Máy ảo Xteink X3 Đồ họa Thật (CrossPoint Reader Native Virtual Machine trên WSL2/WSLg)**:
    - Sử dụng mã nguồn chính thức [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) + [CrossPoint Simulator](https://github.com/crosspoint-reader/crosspoint-simulator).
    - Khởi chạy 1-Click qua `run_crosspoint_x3.bat`, `run_x3_simulator.bat`, hoặc `.\scripts\run_crosspoint_x3.ps1`.
    - Hiển thị cửa sổ đồ họa E-ink thực thụ (792 × 528 pixel) trực tiếp trên Windows Desktop qua WSLg.
