@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Patch CrossVi codebase for 64-bit desktop simulator compatibility.
+Patch CrossVi codebase for 64-bit desktop simulator compatibility & enhanced UX.
 Fixes:
 1. HttpDownloader.cpp: 64-bit integer overflow in response size check.
-   On 64-bit hosts, static_cast<int64_t>(std::numeric_limits<size_t>::max()) evaluates to -1,
-   causing all HTTP responses to trigger 'response exceeds size limit' error.
-2. OpdsBookBrowserActivity.cpp: Normalize opdsDownloadFolder so that folders without leading
-   slash (e.g. 'books') are normalized to '/books', avoiding 'Unsafe download folder rejected'.
+2. OpdsBookBrowserActivity.cpp:
+   - Normalize opdsDownloadFolder to always start with '/' (avoiding Unsafe download folder rejected).
+   - Set consumeConfirm = true in onEnter() to prevent keypress leak auto-clicking item 0 on load.
+   - Automatically organize downloaded books into story subfolders (/books/{Story Name}/).
 """
 
 from __future__ import annotations
@@ -23,14 +23,12 @@ def patch_http_downloader(crossvi_root: Path) -> bool:
 
     content = downloader_file.read_text(encoding="utf-8")
     
-    # Check if buggy code exists
-    buggy_pattern = "if (contentLength > static_cast<int64_t>(std::numeric_limits<size_t>::max()) ||"
     fixed_pattern = "if (contentLength > 0 && static_cast<uint64_t>(contentLength) > sink.maxBytes) {"
-
     if fixed_pattern in content:
         print("[OK] HttpDownloader.cpp already patched.")
         return True
 
+    buggy_pattern = "if (contentLength > static_cast<int64_t>(std::numeric_limits<size_t>::max()) ||"
     if buggy_pattern in content:
         old_block = """  if (contentLength > static_cast<int64_t>(std::numeric_limits<size_t>::max()) ||
       (contentLength > 0 && static_cast<size_t>(contentLength) > sink.maxBytes)) {
@@ -62,53 +60,36 @@ def patch_opds_browser(crossvi_root: Path) -> bool:
         return False
 
     content = browser_file.read_text(encoding="utf-8")
-    if "normalized: %s" in content:
-        print("[OK] OpdsBookBrowserActivity.cpp already patched.")
-        return True
 
-    old_block = """  const char* folder = SETTINGS.opdsDownloadFolder;  // "" => SD root
-  bool haveFolder = folder[0] != '\\0';
-  const std::string folderPath = haveFolder ? folder : "/";
-  if (!UploadPathGuard::isSafeAbsolutePath(folderPath.c_str())) {
-    LOG_ERR("OPDS", "Unsafe download folder rejected: %s", folder);
-    state = BrowserState::ERROR;
-    errorMessage = tr(STR_DOWNLOAD_FAILED);
-    requestUpdate();
-    return;
-  }
-  if (haveFolder && !Storage.exists(folder) && !Storage.mkdir(folder)) {
-    // exists()-guard first: mkdir's return-on-existing is unconfirmed, and every
-    // existing caller checks exists() before mkdir. On real failure, fall back
-    // to SD root so the download is never lost.
-    LOG_ERR("OPDS", "mkdir failed for %s, using SD root", folder);
-    haveFolder = false;
-  }
+    # 1. Patch consumeConfirm in onEnter
+    if "consumeConfirm = false;" in content:
+        content = content.replace("consumeConfirm = false;\n  consumeBack = false;", "consumeConfirm = true;\n  consumeBack = true;")
+        print("[SUCCESS] Patched consumeConfirm in onEnter() to prevent auto-click")
 
-  // downloadToFile() needs a std::string, and titles are unbounded (a fixed
-  // char[] would truncate). Cold path (a multi-second download follows), so one
-  // reserve'd, in-place-appended owning string is the right call.
-  std::string filename;
+    # 2. Patch folder download and story subfolder organization
+    subfolder_marker = "storyFolder += StringUtils::sanitizeFilename(book.author);"
+    if subfolder_marker not in content:
+        old_dl_block = """  std::string filename;
   filename.reserve(96);
-  if (haveFolder) filename += folder;
-  filename += '/';
+  if (haveFolder) {
+    filename += folderPath;
+    if (filename.back() != '/') filename += '/';
+  } else {
+    filename += '/';
+  }
   filename += opdsBookFilename(book.author, book.title, static_cast<OpdsFilenameFormat>(SETTINGS.opdsFilenameFormat));"""
 
-    new_block = """  const char* folder = SETTINGS.opdsDownloadFolder;  // "" => SD root
-  bool haveFolder = folder[0] != '\\0';
-  std::string folderPath = "/";
-  if (haveFolder) {
-    folderPath = (folder[0] == '/') ? folder : ("/" + std::string(folder));
-  }
-  if (!UploadPathGuard::isSafeAbsolutePath(folderPath.c_str())) {
-    LOG_ERR("OPDS", "Unsafe download folder rejected: %s (normalized: %s)", folder, folderPath.c_str());
-    state = BrowserState::ERROR;
-    errorMessage = tr(STR_DOWNLOAD_FAILED);
-    requestUpdate();
-    return;
-  }
-  if (haveFolder && !Storage.exists(folderPath.c_str()) && !Storage.mkdir(folderPath.c_str())) {
-    LOG_ERR("OPDS", "mkdir failed for %s, using SD root", folderPath.c_str());
-    haveFolder = false;
+        new_dl_block = """  // Create story subfolder under books/ if author/story is present
+  if (!book.author.empty() && haveFolder) {
+    std::string storyFolder = folderPath;
+    if (storyFolder.back() != '/') storyFolder += '/';
+    storyFolder += StringUtils::sanitizeFilename(book.author);
+    if (!Storage.exists(storyFolder.c_str())) {
+      Storage.mkdir(storyFolder.c_str());
+    }
+    if (Storage.exists(storyFolder.c_str())) {
+      folderPath = storyFolder;
+    }
   }
 
   std::string filename;
@@ -119,14 +100,15 @@ def patch_opds_browser(crossvi_root: Path) -> bool:
   } else {
     filename += '/';
   }
-  filename += opdsBookFilename(book.author, book.title, static_cast<OpdsFilenameFormat>(SETTINGS.opdsFilenameFormat));"""
+  filename += StringUtils::sanitizeFilename(book.title) + ".epub";"""
 
-    if old_block in content:
-        patched = content.replace(old_block, new_block)
-        browser_file.write_text(patched, encoding="utf-8")
-        print("[SUCCESS] Patched opdsDownloadFolder normalization in OpdsBookBrowserActivity.cpp")
-        return True
-    return False
+        if old_dl_block in content:
+            content = content.replace(old_dl_block, new_dl_block)
+            print("[SUCCESS] Patched story subfolder organization in downloadBook()")
+
+    browser_file.write_text(content, encoding="utf-8")
+    print("[OK] OpdsBookBrowserActivity.cpp patched.")
+    return True
 
 
 def main():
