@@ -1,6 +1,9 @@
 """OPDS 1.2 XML Atom Feed generator for e-reader catalog navigation and book acquisition."""
 
+from __future__ import annotations
+
 import html
+import re
 from datetime import datetime, timezone
 from typing import Sequence
 from app.domain.models import StorySummary, Story
@@ -14,6 +17,25 @@ def format_iso_time(dt: datetime | None = None) -> str:
     return d.isoformat()
 
 
+def format_chapter_title(order: int, raw_title: str, story_title: str = "") -> str:
+    """Format chapter title cleanly as 'Chương {order}_{tên chương}' without trailing story/author names."""
+    clean = raw_title.strip()
+    if story_title and clean.startswith(story_title):
+        clean = clean[len(story_title):].strip(" —-:_")
+
+    # Match existing chapter prefixes (Chương X, Hồi X, Chapter X, Tiết X)
+    m = re.match(r"^(?:chương|hồi|chap|chapter|tiết)\s*\d+[\s:._–—-]*(.*)$", clean, re.IGNORECASE)
+    if m:
+        sub_name = m.group(1).strip()
+        if sub_name:
+            return f"Chương {order}_{sub_name}"
+        return f"Chương {order}"
+
+    if clean and clean != f"Chương {order}":
+        return f"Chương {order}_{clean}"
+    return f"Chương {order}"
+
+
 class OpdsBuilder:
     """Helper to construct standard OPDS 1.2 XML Atom Feed documents."""
 
@@ -23,15 +45,7 @@ class OpdsBuilder:
         current_source_id: str | None = None,
         base_url: str = "",
     ) -> str:
-        """Construct Root OPDS Catalog Feed with:
-        1. Đọc tiếp (đi thẳng vào danh sách chương truyện lần cuối dc tải)
-        2. Chọn nguồn truyện
-        3. Title Nguồn truyện hiện tại đc chọn ở trên
-        4. Truyện mới cập nhật
-        5. Truyện hot
-        6. Truyện hoàn thành
-        7. Thể loại truyện
-        """
+        """Construct Root OPDS Catalog Feed."""
         now = format_iso_time()
         entries: list[str] = []
 
@@ -153,31 +167,31 @@ class OpdsBuilder:
     <link rel="search" href="{base_url}/opds/search?source={source_id}&amp;q={{searchTerms}}" type="application/atom+xml"/>
 
     <entry>
-        <title>⚡ Mới Cập Nhật ({html.escape(source_name)})</title>
+        <title>⚡ Truyện Mới Cập Nhật</title>
         <id>urn:ztruyen:source:{source_id}:latest</id>
         <updated>{now}</updated>
-        <content type="text">Các tác phẩm mới cập nhật từ nguồn {html.escape(source_name)}.</content>
+        <content type="text">Các tác phẩm mới cập nhật từ kho truyện {html.escape(source_name)}.</content>
         <link rel="subsection" href="{base_url}/opds/latest?source={source_id}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
     </entry>
 
     <entry>
-        <title>🔥 Truyện Hot ({html.escape(source_name)})</title>
+        <title>🔥 Truyện Hot &amp; Đọc Nhiều</title>
         <id>urn:ztruyen:source:{source_id}:hot</id>
         <updated>{now}</updated>
-        <content type="text">Các truyện được đọc nhiều nhất từ nguồn {html.escape(source_name)}.</content>
+        <content type="text">Các truyện được đọc nhiều nhất từ kho truyện {html.escape(source_name)}.</content>
         <link rel="subsection" href="{base_url}/opds/hot?source={source_id}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
     </entry>
 
     <entry>
-        <title>✅ Truyện Hoàn Thành ({html.escape(source_name)})</title>
+        <title>✅ Truyện Hoàn Thành (Full Trọn Bộ)</title>
         <id>urn:ztruyen:source:{source_id}:completed</id>
         <updated>{now}</updated>
-        <content type="text">Các truyện đã hoàn thành từ nguồn {html.escape(source_name)}.</content>
+        <content type="text">Các truyện đã hoàn thành trọn bộ từ kho truyện {html.escape(source_name)}.</content>
         <link rel="subsection" href="{base_url}/opds/completed?source={source_id}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
     </entry>
 
     <entry>
-        <title>📂 Thể Loại ({html.escape(source_name)})</title>
+        <title>📂 Thể Loại Truyện</title>
         <id>urn:ztruyen:source:{source_id}:genres</id>
         <updated>{now}</updated>
         <content type="text">Duyệt theo thể loại của {html.escape(source_name)}.</content>
@@ -185,7 +199,7 @@ class OpdsBuilder:
     </entry>
 
     <entry>
-        <title>🌐 Chọn Nguồn Khác</title>
+        <title>🌐 Chọn Kho Truyện Khác</title>
         <id>urn:ztruyen:source:{source_id}:all_sources</id>
         <updated>{now}</updated>
         <content type="text">Chuyển sang nguồn truyện khác.</content>
@@ -229,7 +243,7 @@ class OpdsBuilder:
         <id>{entry_id}</id>
         <updated>{now}</updated>
         <author><name>{escaped_author}</name></author>
-        <content type="text">Nguồn: {s.source_id.upper()} | Tác giả: {escaped_author}</content>
+        <content type="text">Tác giả: {escaped_author}</content>
         <link rel="subsection" href="{story_book_url}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
         {cover_tag}
     </entry>"""
@@ -283,32 +297,21 @@ class OpdsBuilder:
             )
 
         entries: list[str] = []
+        total_ch = story.total_chapters or (volume_slices[-1]["end_order"] if volume_slices else 1)
 
-        # 1. ĐỌC TỪNG CHƯƠNG (STREAMING) - SẮP XẾP TỪ ĐẦU (1 -> N)
+        # 1. ĐỌC TỪNG CHƯƠNG (STREAMING) - TỪ ĐẦU (1 -> N)
         chapters_asc_url = f"{base_url}/opds/book/{story.source_id}/{story.slug}/chapters?sort=asc"
         entries.append(f"""    <entry>
-        <title>⚡ Đọc Từng Chương (Từ Đầu 1 ➔ N)</title>
+        <title>⚡ Đọc Từng Chương (Chương 1 ➔ {total_ch})</title>
         <id>urn:ztruyen:action:{story.source_id}:{story.slug}:chapters_asc</id>
         <updated>{now}</updated>
         <author><name>{escaped_author}</name></author>
-        <summary type="text">Tải tức thì từng chương &amp; tự động tải ngầm khi đọc.</summary>
+        <summary type="text">Duyệt từng chương &amp; tải nhanh tức thì từng file EPUB.</summary>
         <link rel="subsection" href="{chapters_asc_url}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
         {cover_tags}
     </entry>""")
 
-        # 2. ĐỌC TỪNG CHƯƠNG - SẮP XẾP MỚI NHẤT (N -> 1)
-        chapters_desc_url = f"{base_url}/opds/book/{story.source_id}/{story.slug}/chapters?sort=desc"
-        entries.append(f"""    <entry>
-        <title>⚡ Đọc Chương Mới Nhất (N ➔ 1)</title>
-        <id>urn:ztruyen:action:{story.source_id}:{story.slug}:chapters_desc</id>
-        <updated>{now}</updated>
-        <author><name>{escaped_author}</name></author>
-        <summary type="text">Xem các chương mới nhất vừa cập nhật để đọc tiếp.</summary>
-        <link rel="subsection" href="{chapters_desc_url}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
-        {cover_tags}
-    </entry>""")
-
-        # 3. ĐỌC NGAY CHƯƠNG 1
+        # 2. ĐỌC NGAY CHƯƠNG 1
         c1_url = f"{base_url}/opds/download/{story.source_id}/{story.slug}/ztruyen_{story.source_id}_{story.slug}_c0001.epub"
         entries.append(f"""    <entry>
         <title>{escaped_title} — Chương 1</title>
@@ -320,8 +323,7 @@ class OpdsBuilder:
         {cover_tags}
     </entry>""")
 
-        # 4. TẢI TRỌN BỘ (ALL CHƯƠNG)
-        total_ch = story.total_chapters or (volume_slices[-1]["end_order"] if volume_slices else 1)
+        # 3. TẢI TRỌN BỘ (ALL CHƯƠNG)
         all_url = f"{base_url}/opds/download/{story.source_id}/{story.slug}/ztruyen_{story.source_id}_{story.slug}_all.epub"
         entries.append(f"""    <entry>
         <title>{escaped_title} — Trọn Bộ ({total_ch} Chương)</title>
@@ -333,7 +335,7 @@ class OpdsBuilder:
         {cover_tags}
     </entry>""")
 
-        # 5. CÁC TẬP GOM SẴN (50 CHƯƠNG / TẬP)
+        # 4. CÁC TẬP GOM SẴN (50 CHƯƠNG / TẬP)
         for s in volume_slices:
             vol_idx = s["vol_index"]
             start_ch = s["start_order"]
@@ -378,24 +380,120 @@ class OpdsBuilder:
         return xml.strip()
 
     @staticmethod
+    def build_chapter_ranges_feed(
+        story: Story,
+        total_chapters: int,
+        chapters_per_range: int = 50,
+        last_read_order: int | None = None,
+        base_url: str = "",
+        sort_order: str = "asc",
+    ) -> str:
+        """Construct Navigation Feed listing chapter range blocks (50 chapters/range) for long stories."""
+        now = format_iso_time(story.updated_at)
+        escaped_title = html.escape(story.title)
+        clean_author = story.title if (not story.author or story.author == "Đang cập nhật") else story.author
+        escaped_author = html.escape(clean_author)
+        escaped_desc = html.escape(story.description or f"Tác phẩm {story.title}")
+        feed_id = f"urn:ztruyen:book:{story.source_id}:{story.slug}:ranges:{sort_order}"
+        self_url = f"{base_url}/opds/book/{story.source_id}/{story.slug}/chapters?sort={sort_order}"
+
+        cover_tags = ""
+        if story.cover_url:
+            escaped_cover = html.escape(story.cover_url)
+            cover_tags = (
+                f'<link rel="http://opds-spec.org/image" href="{escaped_cover}" type="image/jpeg"/>\n'
+                f'    <link rel="http://opds-spec.org/image/thumbnail" href="{escaped_cover}" type="image/jpeg"/>'
+            )
+
+        entries: list[str] = []
+
+        # 1. ĐỌC TIẾP (Nếu có chương đọc dở)
+        if last_read_order and last_read_order > 0:
+            lr_range_start = ((last_read_order - 1) // chapters_per_range) * chapters_per_range + 1
+            lr_range_end = min(lr_range_start + chapters_per_range - 1, total_chapters)
+            lr_url = f"{base_url}/opds/book/{story.source_id}/{story.slug}/chapters?start={lr_range_start}&limit={chapters_per_range}&sort={sort_order}"
+            entries.append(f"""    <entry>
+        <title>📖 Đọc Tiếp: Chương {last_read_order} (Khối {lr_range_start}-{lr_range_end})</title>
+        <id>urn:ztruyen:range:{story.source_id}:{story.slug}:continue:{last_read_order}</id>
+        <updated>{now}</updated>
+        <author><name>{escaped_author}</name></author>
+        <summary type="text">Tiếp tục từ Chương {last_read_order}</summary>
+        <link rel="subsection" href="{lr_url}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+        {cover_tags}
+    </entry>""")
+
+        # 2. CÁC KHỐI CHƯƠNG (50 CHƯƠNG / KHỐI)
+        ranges: list[tuple[int, int]] = []
+        start = 1
+        while start <= total_chapters:
+            end = min(start + chapters_per_range - 1, total_chapters)
+            ranges.append((start, end))
+            start = end + 1
+
+        if sort_order == "desc":
+            ranges.reverse()
+
+        for s_order, e_order in ranges:
+            count = e_order - s_order + 1
+            range_url = f"{base_url}/opds/book/{story.source_id}/{story.slug}/chapters?start={s_order}&limit={count}&sort={sort_order}"
+            range_id = f"urn:ztruyen:range:{story.source_id}:{story.slug}:r{s_order:04d}_{e_order:04d}"
+            entry = f"""    <entry>
+        <title>📂 Chương {s_order} - {e_order} ({count} Chương)</title>
+        <id>{range_id}</id>
+        <updated>{now}</updated>
+        <author><name>{escaped_author}</name></author>
+        <summary type="text">Danh sách các chương từ Chương {s_order} đến Chương {e_order}</summary>
+        <link rel="subsection" href="{range_url}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+        {cover_tags}
+    </entry>"""
+            entries.append(entry)
+
+        entries_str = "\n".join(entries)
+        xml = f"""<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"
+      xmlns:dc="http://purl.org/dc/terms/"
+      xmlns:opds="http://opds-spec.org/2010/catalog">
+    <id>{feed_id}</id>
+    <title>{escaped_title} — Chọn Khối Chương ({total_chapters} Chương)</title>
+    <updated>{now}</updated>
+    <author><name>{escaped_author}</name></author>
+    <content type="text">{escaped_desc}</content>
+    <link rel="self" href="{self_url}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+    <link rel="start" href="{base_url}/opds" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+    <link rel="up" href="{base_url}/opds/book/{story.source_id}/{story.slug}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+    {cover_tags}
+
+{entries_str}
+</feed>
+"""
+        return xml.strip()
+
+    @staticmethod
     def build_book_chapters_feed(
         story: Story,
         chapters: list,
         base_url: str = "",
         sort_order: str = "asc",
+        range_label: str = "",
+        self_url: str = "",
+        prev_url: str | None = None,
+        next_url: str | None = None,
     ) -> str:
         """Construct Story Detail Feed listing individual chapters.
         Layout:
-          Title (Row 1): Chương X: Tên Chương
-          Author (Row 2): Tên Truyện
+          Title (Row 1): Chương {order}_{tên chương}
+          Author (Row 2): {Tên Tác Giả}
         """
         now = format_iso_time(story.updated_at)
         escaped_title = html.escape(story.title)
         clean_author = story.title if (not story.author or story.author == "Đang cập nhật") else story.author
         escaped_author = html.escape(clean_author)
         escaped_desc = html.escape(story.description or f"Tác phẩm {story.title}")
-        feed_id = f"urn:ztruyen:book:{story.source_id}:{story.slug}:chapters:{sort_order}"
-        self_url = f"{base_url}/opds/book/{story.source_id}/{story.slug}/chapters?sort={sort_order}"
+        
+        feed_id_suffix = f":{range_label}" if range_label else f":{sort_order}"
+        feed_id = f"urn:ztruyen:book:{story.source_id}:{story.slug}:chapters{feed_id_suffix}"
+        if not self_url:
+            self_url = f"{base_url}/opds/book/{story.source_id}/{story.slug}/chapters?sort={sort_order}"
 
         cover_tags = ""
         if story.cover_url:
@@ -409,22 +507,18 @@ class OpdsBuilder:
         for c in chapters:
             order = getattr(c, "order", 1)
             raw_title = getattr(c, "title", f"Chương {order}")
-            
-            # Clean display title to avoid duplicating story name on line 1
-            clean_chap_title = raw_title
-            if clean_chap_title.startswith(story.title):
-                clean_chap_title = clean_chap_title[len(story.title):].strip(" —-:")
+            formatted_title = format_chapter_title(order, raw_title, story.title)
 
             chap_filename = f"ztruyen_{story.source_id}_{story.slug}_c{order:04d}.epub"
             download_url = f"{base_url}/opds/download/{story.source_id}/{story.slug}/{chap_filename}"
             chap_id = f"urn:ztruyen:chapter:{story.source_id}:{story.slug}:c{order:04d}"
 
             entry = f"""    <entry>
-        <title>{html.escape(clean_chap_title)}</title>
+        <title>{html.escape(formatted_title)}</title>
         <id>{chap_id}</id>
         <updated>{now}</updated>
         <author><name>{escaped_author}</name></author>
-        <summary type="text">{escaped_title} — {html.escape(clean_chap_title)}</summary>
+        <summary type="text">{html.escape(formatted_title)}</summary>
         <link rel="http://opds-spec.org/acquisition"
               href="{download_url}"
               type="application/epub+zip"
@@ -435,20 +529,27 @@ class OpdsBuilder:
 
         entries_str = "\n".join(entries)
 
-        sort_label = "Mới nhất (N ➔ 1)" if sort_order == "desc" else "Từ đầu (1 ➔ N)"
+        pagination_links = ""
+        if prev_url:
+            pagination_links += f'    <link rel="previous" href="{html.escape(prev_url)}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>\n'
+        if next_url:
+            pagination_links += f'    <link rel="next" href="{html.escape(next_url)}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>\n'
+
+        feed_title_extra = f" ({range_label})" if range_label else ""
         xml = f"""<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom"
       xmlns:dc="http://purl.org/dc/terms/"
       xmlns:opds="http://opds-spec.org/2010/catalog">
     <id>{feed_id}</id>
-    <title>{escaped_title} — Danh Sách Chương ({sort_label})</title>
+    <title>{escaped_title}{feed_title_extra}</title>
     <updated>{now}</updated>
     <author><name>{escaped_author}</name></author>
     <content type="text">{escaped_desc}</content>
-    <link rel="self" href="{self_url}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+    <link rel="self" href="{html.escape(self_url)}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
     <link rel="start" href="{base_url}/opds" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+    <link rel="up" href="{base_url}/opds/book/{story.source_id}/{story.slug}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
     {cover_tags}
-
+{pagination_links}
 {entries_str}
 </feed>
 """

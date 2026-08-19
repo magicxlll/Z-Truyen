@@ -180,13 +180,19 @@ async def test_opds_completed_and_source_filter() -> None:
 async def test_opds_book_chapters_and_sort() -> None:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # 1. OPDS XML format
-        resp_asc = await client.get("/opds/book/storyaclick/pham-nhan-tu-tien/chapters?sort=asc")
+        # 1. OPDS XML format - Range selection for >50 chapters
+        resp_ranges = await client.get("/opds/book/storyaclick/pham-nhan-tu-tien/chapters?sort=asc")
+        assert resp_ranges.status_code == 200
+        assert "Chương 1 - 50" in resp_ranges.text
+        assert "Chương 51 - 60" in resp_ranges.text
+
+        # 1b. OPDS XML format - Paginated chapters in range
+        resp_asc = await client.get("/opds/book/storyaclick/pham-nhan-tu-tien/chapters?start=1&limit=50&sort=asc")
         assert resp_asc.status_code == 200
         assert "Chương 1" in resp_asc.text
         assert "ztruyen_storyaclick_pham-nhan-tu-tien_c0001.epub" in resp_asc.text
 
-        resp_desc = await client.get("/opds/book/storyaclick/pham-nhan-tu-tien/chapters?sort=desc")
+        resp_desc = await client.get("/opds/book/storyaclick/pham-nhan-tu-tien/chapters?start=60&limit=50&sort=desc")
         assert resp_desc.status_code == 200
         assert "Chương 60" in resp_desc.text
 

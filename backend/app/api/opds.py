@@ -7,6 +7,7 @@ from app.api.opds_builder import OpdsBuilder
 from app.sources.registry import registry
 from app.domain.models import StorySummary
 from app.cache.metadata_repo import repo
+from app.cache.fast_cache import fast_cache
 from app.cache.cover_service import cover_service
 from app.logging import logger
 
@@ -38,7 +39,7 @@ async def get_opds_sources(request: Request) -> Response:
 
     for src in sources:
         entry_xml = f"""    <entry>
-        <title>📚 Kho Truyện: {src.name} ({src.base_url.replace('https://', '')})</title>
+        <title>📚 {src.name}</title>
         <id>urn:ztruyen:source:{src.id}</id>
         <content type="text">Khám phá tác phẩm từ kho truyện {src.name}</content>
         <link rel="subsection" href="{base_url}/opds/source/{src.id}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
@@ -83,26 +84,31 @@ async def get_opds_source_detail(request: Request, source_id: str) -> Response:
 async def get_opds_hot(request: Request, page: int = 1, source: str | None = None) -> Response:
     """Return trending and popular stories across active sources (or single source)."""
     base_url = str(request.base_url).rstrip("/")
+    cache_key = f"feed:hot:{source or 'all'}:{page}"
+
+    async def _fetch():
+        if source:
+            adapter = registry.get(source)
+            adapters = [adapter] if adapter else []
+            title = adapter.name if adapter else source
+        else:
+            adapters = registry.list_adapters()
+            title = "🔥 Truyện Hot & Đọc Nhiều (Tất Cả Nguồn)"
+
+        tasks = [a.get_hot(page) for a in adapters]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        combined_stories: list[StorySummary] = []
+        for res in results:
+            if isinstance(res, list):
+                combined_stories.extend(res)
+            elif isinstance(res, Exception):
+                logger.warning(f"Failed to fetch hot stories from a source: {res}")
+        return title, combined_stories
+
+    title, combined_stories = await fast_cache.get_or_set(cache_key, _fetch, ttl=300)
+
     self_url = f"{base_url}/opds/hot?page={page}" + (f"&source={source}" if source else "")
-
-    if source:
-        adapter = registry.get(source)
-        adapters = [adapter] if adapter else []
-        title = f"🔥 Truyện Hot — {adapter.name if adapter else source}"
-    else:
-        adapters = registry.list_adapters()
-        title = "🔥 Truyện Hot & Đọc Nhiều (Tất Cả Nguồn)"
-
-    tasks = [a.get_hot(page) for a in adapters]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    combined_stories: list[StorySummary] = []
-    for res in results:
-        if isinstance(res, list):
-            combined_stories.extend(res)
-        elif isinstance(res, Exception):
-            logger.warning(f"Failed to fetch hot stories from a source: {res}")
-
     prev_url = f"{base_url}/opds/hot?page={page - 1}" + (f"&source={source}" if source else "") if page > 1 else None
     next_url = f"{base_url}/opds/hot?page={page + 1}" + (f"&source={source}" if source else "") if len(combined_stories) >= 10 else None
 
@@ -124,26 +130,31 @@ async def get_opds_hot(request: Request, page: int = 1, source: str | None = Non
 async def get_opds_latest(request: Request, page: int = 1, source: str | None = None) -> Response:
     """Return newest updated stories."""
     base_url = str(request.base_url).rstrip("/")
+    cache_key = f"feed:latest:{source or 'all'}:{page}"
+
+    async def _fetch():
+        if source:
+            adapter = registry.get(source)
+            adapters = [adapter] if adapter else []
+            title = adapter.name if adapter else source
+        else:
+            adapters = registry.list_adapters()
+            title = "⚡ Truyện Mới Cập Nhật (Tất Cả Nguồn)"
+
+        tasks = [a.get_latest(page) for a in adapters]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        combined_stories: list[StorySummary] = []
+        for res in results:
+            if isinstance(res, list):
+                combined_stories.extend(res)
+            elif isinstance(res, Exception):
+                logger.warning(f"Failed to fetch latest stories: {res}")
+        return title, combined_stories
+
+    title, combined_stories = await fast_cache.get_or_set(cache_key, _fetch, ttl=300)
+
     self_url = f"{base_url}/opds/latest?page={page}" + (f"&source={source}" if source else "")
-
-    if source:
-        adapter = registry.get(source)
-        adapters = [adapter] if adapter else []
-        title = f"⚡ Mới Cập Nhật — {adapter.name if adapter else source}"
-    else:
-        adapters = registry.list_adapters()
-        title = "⚡ Truyện Mới Cập Nhật (Tất Cả Nguồn)"
-
-    tasks = [a.get_latest(page) for a in adapters]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    combined_stories: list[StorySummary] = []
-    for res in results:
-        if isinstance(res, list):
-            combined_stories.extend(res)
-        elif isinstance(res, Exception):
-            logger.warning(f"Failed to fetch latest stories: {res}")
-
     prev_url = f"{base_url}/opds/latest?page={page - 1}" + (f"&source={source}" if source else "") if page > 1 else None
     next_url = f"{base_url}/opds/latest?page={page + 1}" + (f"&source={source}" if source else "") if len(combined_stories) >= 10 else None
 
@@ -164,26 +175,31 @@ async def get_opds_latest(request: Request, page: int = 1, source: str | None = 
 async def get_opds_completed(request: Request, page: int = 1, source: str | None = None) -> Response:
     """Return completed / full stories."""
     base_url = str(request.base_url).rstrip("/")
+    cache_key = f"feed:completed:{source or 'all'}:{page}"
+
+    async def _fetch():
+        if source:
+            adapter = registry.get(source)
+            adapters = [adapter] if adapter else []
+            title = adapter.name if adapter else source
+        else:
+            adapters = registry.list_adapters()
+            title = "✅ Truyện Hoàn Thành (Full Trọn Bộ)"
+
+        tasks = [a.get_completed(page) for a in adapters]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        combined_stories: list[StorySummary] = []
+        for res in results:
+            if isinstance(res, list):
+                combined_stories.extend(res)
+            elif isinstance(res, Exception):
+                logger.warning(f"Failed to fetch completed stories: {res}")
+        return title, combined_stories
+
+    title, combined_stories = await fast_cache.get_or_set(cache_key, _fetch, ttl=600)
+
     self_url = f"{base_url}/opds/completed?page={page}" + (f"&source={source}" if source else "")
-
-    if source:
-        adapter = registry.get(source)
-        adapters = [adapter] if adapter else []
-        title = f"✅ Hoàn Thành — {adapter.name if adapter else source}"
-    else:
-        adapters = registry.list_adapters()
-        title = "✅ Truyện Hoàn Thành (Full Trọn Bộ)"
-
-    tasks = [a.get_completed(page) for a in adapters]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    combined_stories: list[StorySummary] = []
-    for res in results:
-        if isinstance(res, list):
-            combined_stories.extend(res)
-        elif isinstance(res, Exception):
-            logger.warning(f"Failed to fetch completed stories: {res}")
-
     prev_url = f"{base_url}/opds/completed?page={page - 1}" + (f"&source={source}" if source else "") if page > 1 else None
     next_url = f"{base_url}/opds/completed?page={page + 1}" + (f"&source={source}" if source else "") if len(combined_stories) >= 10 else None
 
@@ -204,17 +220,23 @@ async def get_opds_completed(request: Request, page: int = 1, source: str | None
 async def get_opds_genres(request: Request) -> Response:
     """Return list of supported story genres across sources."""
     base_url = str(request.base_url).rstrip("/")
-    tasks = [a.get_genres() for a in registry.list_adapters()]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    cache_key = "feed:genres"
 
-    all_genres = []
-    seen_slugs = set()
-    for res in results:
-        if isinstance(res, list):
-            for g in res:
-                if g.slug not in seen_slugs:
-                    seen_slugs.add(g.slug)
-                    all_genres.append(g)
+    async def _fetch():
+        tasks = [a.get_genres() for a in registry.list_adapters()]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        all_genres = []
+        seen_slugs = set()
+        for res in results:
+            if isinstance(res, list):
+                for g in res:
+                    if g.slug not in seen_slugs:
+                        seen_slugs.add(g.slug)
+                        all_genres.append(g)
+        return all_genres
+
+    all_genres = await fast_cache.get_or_set(cache_key, _fetch, ttl=1800)
 
     xml_entries: list[str] = []
     for g in all_genres:
@@ -249,50 +271,31 @@ async def get_story_cover(
     book_slug: str | None = None,
     url: str | None = None,
 ) -> FileResponse:
-    """
-    Return high-performance, contrast-enhanced JPEG cover for E-ink screen display.
-    Converts WebP/PNG to 100% JPEGDEC-compatible format for Xteink X3.
-    """
-    cover_path = None
-    title = ""
-    target_source = source_id or "general"
-    target_slug = book_slug or "cover"
-
-    if source_id and book_slug:
+    """Proxy and optimize original book cover image to X3 BMP/JPEG dimensions."""
+    target_url = url
+    if not target_url and source_id and book_slug:
         cached_story = repo.get_story(source_id, book_slug)
-        cover_remote_url = url or (cached_story.cover_url if cached_story else None)
-        title = cached_story.title if cached_story else book_slug
-
-        if not cover_remote_url:
+        if cached_story and cached_story.cover_url:
+            target_url = cached_story.cover_url
+        else:
             adapter = registry.get(source_id)
             if adapter:
                 try:
-                    s_detail = await adapter.get_story_detail(book_slug)
-                    cover_remote_url = s_detail.cover_url
-                    title = s_detail.title
-                    repo.upsert_story(s_detail)
-                except Exception:
-                    pass
+                    story = await adapter.get_story_detail(book_slug)
+                    target_url = story.cover_url
+                except Exception as e:
+                    logger.warning(f"Could not resolve cover URL for {source_id}:{book_slug}: {e}")
 
+    if not target_url:
+        raise HTTPException(status_code=404, detail="Cover image URL not found")
+
+    try:
         cover_path = await cover_service.get_or_create_cover(
-            source_id=source_id,
-            slug=book_slug,
-            cover_url=cover_remote_url,
-            title=title,
+            source_id=source_id or "generic",
+            slug=book_slug or "cover",
+            cover_url=target_url,
         )
-    elif url:
-        cover_path = await cover_service.get_or_create_cover(
-            source_id="remote",
-            slug=cover_service.storage.calculate_sha1(url.encode())[:12],
-            cover_url=url,
-            title=title,
-        )
-
-    if cover_path and cover_path.is_file():
-        return FileResponse(
-            path=cover_path,
-            media_type="image/jpeg",
-            headers={"Cache-Control": "public, max-age=86400"},
-        )
-
-    raise HTTPException(status_code=404, detail="Cover not found")
+        return FileResponse(path=cover_path, media_type="image/jpeg")
+    except Exception as e:
+        logger.error(f"Failed to serve cover image ({target_url}): {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to retrieve cover image: {e}")

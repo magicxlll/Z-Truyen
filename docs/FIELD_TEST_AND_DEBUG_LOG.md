@@ -16,6 +16,7 @@
 | **BUG-006** | EPUB Download UX | Nút Tải EPUB không phản hồi do thiếu loading feedback | ✅ Đã khắc phục | 2026-08-19 |
 | **BUG-007** | OPDS UI Layout | Tiêu đề chương trên màn hình e-ink X3 bị tràn & cắt thành `...` | ✅ Đã khắc phục | 2026-08-19 |
 | **BUG-008** | Native Simulator | Biên dịch GCC 15 trên Linux/WSL gặp lỗi narrowing, C23 bool | ✅ Đã khắc phục | 2026-08-19 |
+| **BUG-011** | 64-bit Simulator | Lỗi ép kiểu `size_t::max() -> int64_t = -1` gây `exceeds size limit` | ✅ Đã khắc phục | 2026-08-19 |
 | **DEPLOY-001** | Môi trường Android | Cài đặt toàn bộ 26 packages (FastAPI, EbookLib, Zeroconf...) | 🟢 Hoàn tất 100% | 2026-08-19 |
 | **RULE-001** | Firmware Integrity | Tuyệt đối tuân thủ 100% Stock Factory Firmware của Xteink X3 | 🟢 Tuân thủ 100% | 2026-08-19 |
 
@@ -196,7 +197,20 @@
   2. Bọc `typedef unsigned char bool;` trong `QRCode` bằng điều kiện kiểm tra phiên bản chuẩn C23 (`__STDC_VERSION__ < 202311L`).
   3. Bổ sung các stub tương thích (`IDLE_POWER_SAVING_MS`, `combinesGrayscaleBase`) trong thư viện giả lập phần cứng `crosspoint-simulator`.
 
-### 13. RULE-001: Nguyên Tắc Bất Di Bất Dịch — Giữ 100% Stock Factory Firmware
+### 13. BUG-011: Lỗi Tràn Số Nguyên 64-bit Trong `HttpDownloader.cpp` Khi Chạy Simulator Trên macOS
+- **Triệu chứng**: Kết nối mạng báo xanh, nhưng khi vào OPDS Browser duyệt server Termux hoặc Localhost thì màn hình máy ảo báo: `Lỗi: Không tải được danh mục` và log terminal ghi nhận `[ERR] [HTTP] response exceeds size limit`.
+- **Nguyên nhân gốc rễ (Root Cause)**:
+  - Trong hàm `HttpDownloader::runGetSecure()`, dòng kiểm tra kích thước:
+    `if (contentLength > static_cast<int64_t>(std::numeric_limits<size_t>::max()) || ...)`
+  - Trên vi điều khiển ESP32 (32-bit), `size_t` là 32-bit (`uint32_t::max() = 4294967295`), khi ép sang `int64_t` vẫn là `+4294967295LL`.
+  - Trên hệ điều hành 64-bit máy tính (macOS Apple Silicon & Linux x86_64), `size_t` là 64-bit (`uint64_t::max() = 0xFFFFFFFFFFFFFFFF`), khi ép sang số nguyên có dấu `int64_t` sẽ bị tràn bit và trở thành **`-1`**!
+  - Kết quả là bất kỳ phản hồi HTTP nào có `contentLength >= 0` đều thỏa mãn điều kiện `contentLength > -1` (luôn luôn `TRUE`), khiến toàn bộ các request tải feed OPDS hoặc sách đều bị hủy ngay lập tức.
+- **Khắc phục**:
+  - Viết script tự động vá lỗi [`scripts/patch_crossvi.py`](file:///Users/vietph/Library/CloudStorage/GoogleDrive-vietph.eng@gmail.com/Other%20computers/My%20Computer/DATA/Antigravity/Z-Truyen/Z-Truyen/scripts/patch_crossvi.py).
+  - Sửa lại điều kiện kiểm tra kích thước thành: `if (contentLength > 0 && static_cast<uint64_t>(contentLength) > sink.maxBytes)`.
+  - Tích hợp bước tự động áp dụng bản vá này vào launcher [`run_crossvi_x3.command`](file:///Users/vietph/Library/CloudStorage/GoogleDrive-vietph.eng@gmail.com/Other%20computers/My%20Computer/DATA/Antigravity/Z-Truyen/Z-Truyen/run_crossvi_x3.command).
+
+### 14. RULE-001: Nguyên Tắc Bất Di Bất Dịch — Giữ 100% Stock Factory Firmware
 - **Quy tắc**: Tuyệt đối **KHÔNG** chỉnh sửa hoặc can thiệp vào mã nguồn firmware gốc của CrossPoint Reader / Xteink X3 để đạt được mục đích.
 - **Lý do**: Máy đọc sách Xteink X3 vật lý ngoài đời chạy firmware gốc xuất xưởng của nhà sản xuất (hoặc bản flash release chính thức). Người dùng không thể và không nên tùy tiện flash custom firmware vì rủi ro brick máy cao.
 - **Giải pháp chuẩn**: Mọi tính năng (danh sách chương, tiếp tục đọc, phân loại danh mục, ảnh bìa, gom tập KOSync) phải được hiện thực hoàn toàn 100% phía **Backend Server OPDS** theo đúng đặc tả Atom / OPDS 1.2 RFC.

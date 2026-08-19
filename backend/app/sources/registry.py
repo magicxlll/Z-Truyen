@@ -18,6 +18,11 @@ class SourceRegistry:
     def register(self, adapter: SourceAdapter) -> None:
         """Register a new source adapter."""
         self._adapters[adapter.id] = adapter
+        try:
+            from app.cache.fast_cache import fast_cache
+            fast_cache.clear()
+        except Exception:
+            pass
         logger.info(f"Registered source adapter: {adapter.name} ({adapter.id})")
 
     def get(self, source_id: str) -> SourceAdapter | None:
