@@ -139,6 +139,16 @@
   3. **Smart Cache Manager**: Tự động dọn dẹp các chương cũ hơn $N-5$ để tránh đầy bộ nhớ điện thoại.
   4. **Volume Bundler**: Vẫn duy trì tùy chọn tải gom tập 50 chương/tập cho mục đích đọc offline đường dài.
 
+### 8. BUG-009: Thiếu `import asyncio` trong `storyaclick.py` khi tải tập/chương phân trang
+- **Môi trường**: Backend chạy trên điện thoại Termux hoặc PC khi client yêu cầu tải tập/chương từ nguồn Storya.click (ví dụ: *Mục Thần Ký*, *Xích Tâm Tuần Thiên*).
+- **Hiện tượng**: Máy ảo CrossPoint báo lỗi `Download failed`, log server Termux ghi nhận `500 Internal Server Error` với dòng lỗi: `NameError: name 'asyncio' is not defined`.
+- **Nguyên nhân gốc rễ (Root Cause)**:
+  - Trong hàm `get_all_chapters()` của `storyaclick.py`, tính năng cào phân trang song song sử dụng `asyncio.Semaphore` và `asyncio.gather` nhưng module bị thiếu dòng `import asyncio` ở đầu file.
+- **Cách khắc phục**:
+  - Thêm `import asyncio` vào đầu `backend/app/sources/storyaclick.py`.
+  - Bổ sung unit/integration test `test_storyaclick_mock_flow` kiểm tra trường hợp phân trang `totalPages > 1` gọi `get_all_chapters()`.
+  - Cập nhật mã nguồn lên GitHub để Termux kéo về qua lệnh `ztruyen-update`.
+
 ---
 
 ### 8. PERF-001: Phân Tích Hiện Tượng "Chuyển Sang Termux Tốc Độ Nhanh Hơn Trình Duyệt"

@@ -46,13 +46,23 @@ async def test_storyaclick_mock_flow() -> None:
                     },
                 )
             elif "/chapters/story/pham-nhan-tu-tien" in url_str:
+                if "page=2" in url_str:
+                    return httpx.Response(
+                        200,
+                        json={
+                            "data": [
+                                {"order": 2, "title": "Chương 2: Nhập môn", "slug": "chuong-2"}
+                            ],
+                            "meta": {"totalPages": 2},
+                        },
+                    )
                 return httpx.Response(
                     200,
                     json={
                         "data": [
                             {"order": 1, "title": "Chương 1: Sơn thôn thiếu niên", "slug": "chuong-1"}
                         ],
-                        "meta": {"totalPages": 1},
+                        "meta": {"totalPages": 2},
                     },
                 )
             elif "/chapters/pham-nhan-tu-tien/chuong-1" in url_str:
@@ -89,8 +99,15 @@ async def test_storyaclick_mock_flow() -> None:
     chapters, total_p = await adapter.list_chapters("pham-nhan-tu-tien")
     assert len(chapters) == 1
     assert chapters[0].slug == "chuong-1"
+    assert total_p == 2
 
-    # 4. Content
+    # 4. Multi-page get_all_chapters
+    all_chapters = await adapter.get_all_chapters("pham-nhan-tu-tien")
+    assert len(all_chapters) == 2
+    assert all_chapters[0].slug == "chuong-1"
+    assert all_chapters[1].slug == "chuong-2"
+
+    # 5. Content
     content = await adapter.get_chapter_content("pham-nhan-tu-tien", "chuong-1")
     assert '<p id="p-1">Hàn Lập sinh ra tại một thôn làng nghèo khó.</p>' in content.content_html
 

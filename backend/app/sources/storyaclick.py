@@ -1,5 +1,6 @@
 """Source Adapter for Storya.click (JSON REST API)."""
 
+import asyncio
 from typing import Any
 from urllib.parse import quote_plus
 from app.fetcher.client import http_client, HttpClient
