@@ -271,5 +271,110 @@ class VolumeBundler:
                     except Exception as e:
                         logger.debug(f"[SmartCache] Failed to delete {old_filename}: {e}")
 
+    async def get_or_build_custom_range(
+        self,
+        source_id: str,
+        story_slug: str,
+        start_order: int,
+        end_order: int,
+    ) -> tuple[Path, str]:
+        """Build and cache a custom range of chapters (e.g., 1-32 or all) into a single EPUB file."""
+        if start_order < 1:
+            start_order = 1
+        if end_order < start_order:
+            end_order = start_order
+
+        is_all = (start_order == 1 and end_order >= 99999)
+        if is_all:
+            filename = f"ztruyen_{source_id}_{story_slug}_all.epub"
+        else:
+            filename = f"ztruyen_{source_id}_{story_slug}_c{start_order:04d}-{end_order:04d}.epub"
+
+        cached_path = self.storage.get_epub_path(filename)
+        if cached_path:
+            sha1 = self.storage.calculate_file_sha1(cached_path)
+            return cached_path, sha1
+
+        lock_key = f"{source_id}:{story_slug}:{filename}"
+        async with self._get_lock(lock_key):
+            cached_path = self.storage.get_epub_path(filename)
+            if cached_path:
+                sha1 = self.storage.calculate_file_sha1(cached_path)
+                return cached_path, sha1
+
+            adapter = self.registry.get(source_id)
+            if not adapter:
+                raise ValueError(f"Unknown source adapter '{source_id}'")
+
+            story = await adapter.get_story_detail(story_slug)
+            all_chapters_summary = await adapter.get_all_chapters(story_slug)
+            total_chapters = len(all_chapters_summary)
+            if total_chapters == 0:
+                raise ValueError(f"No chapters found for story '{story_slug}'")
+
+            actual_end_order = min(end_order, total_chapters)
+            actual_start_order = min(start_order, actual_end_order)
+
+            target_summaries = [
+                c for c in all_chapters_summary if actual_start_order <= c.order <= actual_end_order
+            ]
+            if not target_summaries:
+                target_summaries = all_chapters_summary[actual_start_order - 1 : actual_end_order]
+
+            sem = asyncio.Semaphore(settings.FAST_SCRAPE_CONCURRENCY)
+
+            async def fetch_single_chap(chap_summary) -> Chapter:
+                cached_chap = self.repo.get_chapter(source_id, story_slug, chap_summary.slug)
+                if cached_chap and cached_chap.content_clean:
+                    return cached_chap
+
+                async with sem:
+                    chap_content = await adapter.get_chapter_content(story_slug, chap_summary.slug)
+                    domain_chap = Chapter(
+                        id=build_chapter_id(source_id, story_slug, chap_summary.slug),
+                        story_id=build_story_id(source_id, story_slug),
+                        order_num=chap_summary.order,
+                        title=chap_summary.title,
+                        original_url=chap_content.original_url,
+                        content_clean=chap_content.content_html,
+                        is_vip=chap_summary.is_vip,
+                    )
+                    self.repo.upsert_chapter(domain_chap)
+                    return domain_chap
+
+            chapters_to_compile = await asyncio.gather(
+                *(fetch_single_chap(c) for c in target_summaries)
+            )
+            chapters_to_compile = sorted(chapters_to_compile, key=lambda c: c.order_num)
+
+            cover_bytes: bytes | None = None
+            if story.cover_url:
+                try:
+                    cover_resp = await adapter.client.get(story.cover_url)
+                    if cover_resp.status_code == 200:
+                        cover_bytes = cover_resp.content
+                except Exception as e:
+                    logger.warning(f"Could not download cover: {e}")
+
+            if is_all or (actual_start_order == 1 and actual_end_order == total_chapters):
+                volume_title = f"Trọn Bộ ({total_chapters} Chương)"
+                identifier = f"urn:ztruyen:{source_id}:{story_slug}:all"
+            else:
+                volume_title = f"Chương {actual_start_order}-{actual_end_order}"
+                identifier = f"urn:ztruyen:{source_id}:{story_slug}:c{actual_start_order:04d}-{actual_end_order:04d}"
+
+            epub_bytes, sha1_hash = self.builder.build(
+                identifier=identifier,
+                title=story.title,
+                author=story.author,
+                source_name=adapter.name,
+                volume_title=volume_title,
+                chapters=chapters_to_compile,
+                cover_image_bytes=cover_bytes,
+            )
+
+            saved_file_path = self.storage.save_epub(filename, epub_bytes)
+            return saved_file_path, sha1_hash
+
 
 volume_bundler = VolumeBundler()

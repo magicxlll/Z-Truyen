@@ -208,3 +208,22 @@ async def test_opds_single_chapter_download() -> None:
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/epub+zip"
         assert len(response.content) > 0
+
+
+@pytest.mark.asyncio
+async def test_opds_custom_range_and_all_download() -> None:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Custom Range (e.g. Chương 1 - 10)
+        url_range = "/opds/download/storyaclick/pham-nhan-tu-tien/ztruyen_storyaclick_pham-nhan-tu-tien_c0001-0010.epub"
+        resp_range = await client.get(url_range)
+        assert resp_range.status_code == 200
+        assert resp_range.headers["content-type"] == "application/epub+zip"
+        assert len(resp_range.content) > 0
+
+        # 2. All Chapters
+        url_all = "/opds/download/storyaclick/pham-nhan-tu-tien/ztruyen_storyaclick_pham-nhan-tu-tien_all.epub"
+        resp_all = await client.get(url_all)
+        assert resp_all.status_code == 200
+        assert resp_all.headers["content-type"] == "application/epub+zip"
+        assert len(resp_all.content) > 0

@@ -174,22 +174,84 @@ class OpdsSimulator:
                 self.show_story_list(link, selected["title"])
 
     def show_story_detail(self, detail_url: str, story_title: str):
-        print(f"\n📖 Đang nạp danh mục tập của truyện: '{story_title}'...")
-        entries = self.fetch_feed(detail_url)
-        if not entries:
-            print("    (Không tìm thấy tập nào)")
+        # Extract source and slug from detail URL
+        import re
+        match = re.search(r"/book/([^/]+)/([^/]+)", detail_url)
+        if not match:
+            print("    ❌ Không phân tích được đường dẫn truyện.")
+            return
+        source_id, story_slug = match.group(1), match.group(2)
+
+        print(f"\n📖 Đang tải toàn bộ dữ liệu chương của: '{story_title}' từ {source_id}...")
+        try:
+            r = self.client.get(f"{self.base_url}/opds/api/book/{source_id}/{story_slug}")
+            if r.status_code != 200:
+                print(f"    ❌ Lỗi nạp danh sách chương: HTTP {r.status_code}")
+                return
+            data = r.json()
+            story_meta = data.get("story", {})
+            chapters = data.get("chapters", [])
+        except Exception as e:
+            print(f"    ❌ Không thể nạp dữ liệu: {e}")
             return
 
-        print(f"\n=== DANH SÁCH CÁC TẬP (Mỗi tập 50 chương) ===")
-        for idx, item in enumerate(entries, 1):
-            print(f"  [{idx:02d}] {item['title']} ({item['summary']})")
+        total_ch = len(chapters)
+        page_size = 50
+        total_pages = (total_ch + page_size - 1) // page_size if total_ch > 0 else 1
+        current_page = 1
 
-        print("\n👉 Chọn số thứ tự Tập để tải file EPUB về máy (hoặc Enter để quay lại): ", end="")
-        sel = input().strip()
-        if sel.isdigit() and 1 <= int(sel) <= len(entries):
-            selected_vol = entries[int(sel) - 1]
-            dl_link = selected_vol["links"].get("http://opds-spec.org/acquisition") or list(selected_vol["links"].values())[0]
-            self.download_and_verify_epub(dl_link, selected_vol["title"])
+        while True:
+            start_idx = (current_page - 1) * page_size
+            end_idx = min(start_idx + page_size, total_ch)
+            page_chaps = chapters[start_idx:end_idx]
+
+            print(f"\n" + "=" * 65)
+            print(f"  📖 {story_title.upper()}")
+            print(f"  Tác giả: {story_meta.get('author', 'Đang cập nhật')} | Tổng: {total_ch} chương")
+            print(f"  📄 TRANG [{current_page}/{total_pages}] (Hiển thị chương {start_idx + 1} - {end_idx})")
+            print("=" * 65)
+
+            for c in page_chaps:
+                print(f"  [{c['order']:03d}] {c['title']}")
+
+            print("\n" + "-" * 65)
+            print("  👉 CÁC CÚ PHÁP TẢI VÀ ĐỌC SÁCH:")
+            print("     - Nhập 1 số (Ví dụ: 32)      ➔ Tải & Đọc riêng Chương 32 (0.3s)")
+            print("     - Nhập khoảng (Ví dụ: 1-32)  ➔ Tải và GOM Chương 1 đến 32 vào 1 file EPUB")
+            print("     - Nhập 'all' hoặc 'ALL'      ➔ Tải và GOM TOÀN BỘ TRỌN BỘ vào 1 file EPUB")
+            if total_pages > 1:
+                print("     - Nhập 'n' (Next) / 'p' (Prev)➔ Sang trang sau / Quay lại trang trước")
+            print("     - Nhấn [Enter]               ➔ Quay lại danh sách truyện")
+            print("-" * 65)
+
+            user_cmd = input("👉 Nhập lựa chọn của bạn: ").strip()
+
+            if not user_cmd:
+                break
+            elif user_cmd.lower() == "n" and current_page < total_pages:
+                current_page += 1
+            elif user_cmd.lower() == "p" and current_page > 1:
+                current_page -= 1
+            elif user_cmd.lower() == "all":
+                dl_url = f"/opds/download/{source_id}/{story_slug}/ztruyen_{source_id}_{story_slug}_all.epub"
+                self.download_and_verify_epub(dl_url, f"{story_title} - Trọn Bộ ({total_ch} Chương)")
+            elif "-" in user_cmd:
+                parts = user_cmd.split("-")
+                if len(parts) == 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+                    s_num, e_num = int(parts[0].strip()), int(parts[1].strip())
+                    dl_url = f"/opds/download/{source_id}/{story_slug}/ztruyen_{source_id}_{story_slug}_c{s_num:04d}-{e_num:04d}.epub"
+                    self.download_and_verify_epub(dl_url, f"{story_title} - Gom Chương {s_num} đến {e_num}")
+                else:
+                    print("⚠️ Cú pháp khoảng chương không hợp lệ (Ví dụ đúng: 1-32)")
+            elif user_cmd.isdigit():
+                chap_num = int(user_cmd)
+                if 1 <= chap_num <= total_ch:
+                    dl_url = f"/opds/download/{source_id}/{story_slug}/ztruyen_{source_id}_{story_slug}_c{chap_num:04d}.epub"
+                    self.download_and_verify_epub(dl_url, f"{story_title} - Chương {chap_num}")
+                else:
+                    print(f"⚠️ Số chương vượt quá giới hạn (Truyện có từ 1 đến {total_ch} chương)")
+            else:
+                print("⚠️ Lựa chọn không hợp lệ, vui lòng thử lại!")
 
     def download_and_verify_epub(self, download_url: str, volume_title: str):
         full_url = download_url if download_url.startswith("http") else f"{self.base_url}{download_url}"

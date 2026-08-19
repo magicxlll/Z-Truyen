@@ -917,6 +917,17 @@ WEB_HTML = """<!DOCTYPE html>
                     </div>
                     <input type="text" id="chap-search" class="chap-search-input" placeholder="🔍 Đến chương..." oninput="filterChapters()" />
                 </div>
+                
+                <div style="display: flex; gap: 0.5rem; align-items: center; background-color: rgba(15, 23, 42, 0.7); padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); flex-wrap: wrap; margin-top: 0.4rem;">
+                    <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-main);">📥 Gom File:</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Từ</span>
+                    <input type="number" id="range-start" value="1" min="1" max="${chapters.length}" style="width: 55px; padding: 0.25rem 0.4rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 0.75rem;" />
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">&rarr; Đến</span>
+                    <input type="number" id="range-end" value="${Math.min(32, chapters.length)}" min="1" max="${chapters.length}" style="width: 55px; padding: 0.25rem 0.4rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); font-size: 0.75rem;" />
+                    <button type="button" class="dl-btn" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; width: auto;" onclick="downloadRange(this)">📥 Gom Tải</button>
+                    <button type="button" class="dl-btn" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; width: auto; background-color: var(--accent); color: #0f172a;" onclick="downloadAll(this)">📚 Tải Trọn Bộ (ALL)</button>
+                </div>
+
                 <div style="font-size: 0.75rem; color: var(--primary); padding: 0.2rem 0;">
                     💡 Nhấn chương để đọc tức thì &amp; tự động tải ngầm 3 chương kế tiếp.
                 </div>
@@ -935,6 +946,20 @@ WEB_HTML = """<!DOCTYPE html>
 
             html += '</div>';
             modalContent.innerHTML = html;
+        }
+
+        function downloadRange(btn) {
+            const s = parseInt(document.getElementById('range-start').value, 10) || 1;
+            const e = parseInt(document.getElementById('range-end').value, 10) || s;
+            const filename = `ztruyen_${currentStoryData.source_id}_${currentStoryData.slug}_c${String(s).padStart(4, '0')}-${String(e).padStart(4, '0')}.epub`;
+            const url = `/opds/download/${currentStoryData.source_id}/${currentStoryData.slug}/${filename}`;
+            startDownload(url, filename, btn);
+        }
+
+        function downloadAll(btn) {
+            const filename = `ztruyen_${currentStoryData.source_id}_${currentStoryData.slug}_all.epub`;
+            const url = `/opds/download/${currentStoryData.source_id}/${currentStoryData.slug}/${filename}`;
+            startDownload(url, filename, btn);
         }
 
         async function renderVolumesTab() {
