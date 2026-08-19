@@ -1,0 +1,152 @@
+openapi: 3.1.0
+info:
+  title: Z-Truyen Backend API & OPDS Catalog
+  version: 1.0.0
+  description: Backend API phục vụ luồng khám phá, cào truyện và cung cấp catalog OPDS 1.2 cho máy đọc sách Xteink X3 (CrossVi/CrossPoint) và KOReader.
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://ztruyen.local
+    description: Home Mac mini M4 via Cloudflare Tunnel
+paths:
+  /healthz:
+    get:
+      summary: Healthcheck
+      operationId: getHealth
+      responses:
+        '200':
+          description: Server healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  version:
+                    type: string
+                    example: 1.0.0
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /version:
+    get:
+      summary: Version Information
+      operationId: getVersion
+      responses:
+        '200':
+          description: Version metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  app:
+                    type: string
+                    example: z-truyen-backend
+                  version:
+                    type: string
+                    example: 1.0.0
+                  git_sha:
+                    type: string
+
+  /opds:
+    get:
+      summary: Root OPDS Catalog Feed
+      description: Trả về danh mục gốc OPDS 1.2 dạng XML Atom Feed cho máy đọc sách X3.
+      operationId: getOpdsRoot
+      responses:
+        '200':
+          description: Atom Feed XML
+          content:
+            application/atom+xml;profile=opds-catalog:
+              schema:
+                type: string
+
+  /opds/search:
+    get:
+      summary: Search Stories via OPDS
+      description: Tìm kiếm truyện theo từ khóa qua giao thức OpenSearch OPDS.
+      operationId: searchOpds
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Từ khóa tìm kiếm
+          schema:
+            type: string
+        - name: source
+          in: query
+          required: false
+          description: Giới hạn tìm kiếm trong nguồn cụ thể (storyaclick, akaytruyen, conduongbachu)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atom Feed XML chứa danh sách kết quả tìm kiếm
+          content:
+            application/atom+xml;profile=opds-catalog:
+              schema:
+                type: string
+
+  /opds/book/{source_id}/{book_slug}:
+    get:
+      summary: Book Details & Volume Catalog
+      description: Chi tiết bộ truyện kèm danh sách các Volume EPUB để tải.
+      operationId: getOpdsBook
+      parameters:
+        - name: source_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: book_slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atom Feed XML chi tiết truyện và danh sách link tải Volume EPUB
+          content:
+            application/atom+xml;profile=opds-catalog:
+              schema:
+                type: string
+
+  /opds/download/{source_id}/{book_slug}/{artifact_name}:
+    get:
+      summary: Download Generated EPUB File
+      description: Tải trực tiếp file EPUB (Volume hoặc Single Chapter) về thẻ nhớ SD của X3.
+      operationId: downloadEpub
+      parameters:
+        - name: source_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: book_slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifact_name
+          in: path
+          required: true
+          description: Tên file dạng ztruyen_{source}_{slug}_v01.epub
+          schema:
+            type: string
+      responses:
+        '200':
+          description: EPUB binary package
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="ztruyen_conduongbachu_main_v01.epub"
+          content:
+            application/epub+zip:
+              schema:
+                type: string
+                format: binary

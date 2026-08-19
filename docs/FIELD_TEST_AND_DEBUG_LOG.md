@@ -1,0 +1,157 @@
+# 📘 Nhật Ký Xử Lý Sự Cố & Đúc Kết Kinh Nghiệm Triển Khai Thực Tế
+**Dự án**: Z-Truyen X3 (Vietnamese Story Backend & OPDS Integration)  
+**Tài liệu**: Tổng hợp lỗi, nguyên nhân, cách xử lý và bài học kinh nghiệm từ quá trình cài đặt & kiểm thử thực tế.
+
+---
+
+## 📑 Bảng Tổng Hợp Sự Cố & Tiến Trình Xử Lý
+
+| Mã Lỗi | Thành Phần | Hiện Tượng / Thông Báo Lỗi | Trạng Thái | Ngày Ghi Nhận |
+|:---:|---|---|:---:|:---:|
+| **BUG-001** | Termux Repo | `Could not connect to mirror.sjtu.edu.cn:443 - connection abort` | ✅ Đã khắc phục | 2026-08-19 |
+| **BUG-002** | Python/Rust Build | `Failed to build 'pydantic-core' ... Rust not found` | ✅ Đã khắc phục | 2026-08-19 |
+| **BUG-003** | Android Permissions | `PermissionError: [Errno 13] Permission denied: '.../cache/epubs'` | ✅ Đã khắc phục | 2026-08-19 |
+| **BUG-004** | Termux Shell | `start-server.sh: ip: command not found` | ✅ Đã khắc phục | 2026-08-19 |
+| **BUG-005** | Web UI Responsive | Giao diện bị bung chiều ngang trên màn hình điện thoại | ✅ Đã khắc phục | 2026-08-19 |
+| **BUG-006** | EPUB Download UX | Nút Tải EPUB không phản hồi do thiếu loading feedback | ✅ Đã khắc phục | 2026-08-19 |
+| **DEPLOY-001** | Môi trường Android | Cài đặt toàn bộ 26 packages (FastAPI, EbookLib, Zeroconf...) | 🟢 Hoàn tất 100% | 2026-08-19 |
+
+---
+
+## 🛠️ Chi Tiết Từng Sự Cố & Giải Pháp Kỹ Thuật
+
+### 1. BUG-001: Lỗi kết nối Mirror Package Manager của Termux
+- **Môi trường**: Android Termux (mới cài đặt lần đầu).
+- **Hiện tượng**:
+  ```text
+  Err:1 https://mirror.sjtu.edu.cn/termux/termux-main ...
+  Could not connect to mirror.sjtu.edu.cn:443 - connect (103: Software caused connection abort)
+  E: Failed to fetch ...
+  E: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?
+  ```
+- **Nguyên nhân gốc rễ (Root Cause)**:
+  - Termux mặc định kết nối tới máy chủ mirror tại Trung Quốc (`mirror.sjtu.edu.cn`).
+  - Đường truyền quốc tế từ các nhà mạng Việt Nam tới server này thường bị nghẽn mạng, timeout hoặc ngắt kết nối (`Connection abort`).
+- **Cách khắc phục**:
+  1. Chạy lệnh: `termux-change-repo`
+  2. Tại màn hình 1 (Repositories), nhấn **OK**.
+  3. Tại màn hình 2 (Mirrors), chọn **`Mirrors by Grimler`** (châu Âu/Mỹ) hoặc **`Mirrors hosted by Tsinghua`** -> Nhấn **OK**.
+- **Đúc kết kinh nghiệm & Khuyến nghị tài liệu**:
+  - Nên đưa bước kiểm tra/chuyển đổi repo `termux-change-repo` lên ngay đầu hướng dẫn cài đặt cho người dùng mới.
+
+---
+
+### 2. BUG-002: Lỗi biên dịch `pydantic-core` do thiếu Rust toolchain trên ARM64
+- **Môi trường**: Android Termux (Kiến trúc `aarch64` / ARM64, Python 3.14).
+- **Hiện tượng**:
+  ```text
+  Collecting pydantic-core==2.46.4
+    Installing build dependencies ... error
+    error: subprocess-exited-with-error
+    × installing build dependencies for pydantic-core did not run successfully.
+    Target triple not supported by rustup: aarch64-unknown-linux-android
+    Rust not found, installing into a temporary directory
+  ERROR: Failed to build 'pydantic-core' when installing build dependencies for pydantic-core
+  ```
+- **Nguyên nhân gốc rễ (Root Cause)**:
+  - Trên kiến trúc Android `aarch64` với Python 3.14 (phiên bản mới nhất của Termux), PyPI chưa có sẵn pre-built binary wheel (`.whl`).
+  - Pip bắt buộc phải tải source tarball (`.tar.gz`) và biên dịch từ mã nguồn.
+  - `pydantic-core` được viết bằng **Rust** (sử dụng build tool `maturin`).
+  - Khi thiếu trình biên dịch Rust (`rustc` & `cargo`) của hệ điều hành Termux, maturin cố gắng dùng `rustup` nhưng không hỗ trợ trực tiếp target `aarch64-unknown-linux-android`, dẫn tới build failure.
+- **Cách khắc phục**:
+  1. Cài đặt bộ công cụ biên dịch Rust và Binutils vào Termux:
+     ```bash
+     pkg install -y rust binutils
+     ```
+  2. Chạy lại script cài đặt:
+     ```bash
+     cd ~/ztruyen
+     bash android/setup-termux.sh
+     ```
+- **Cập nhật mã nguồn hệ thống**:
+  - Đã cập nhật file [`android/setup-termux.sh`](file:///D:/03_APP/3.%20System/DATA/Antigravity/Z-Truyen/android/setup-termux.sh#L13-L17) bổ sung sẵn gói `rust` và `binutils` trong danh sách cài đặt mặc định:
+    ```bash
+    pkg install -y python git clang make rust binutils libxml2 libxslt libjpeg-turbo libffi openssl termux-tools
+    ```
+
+---
+
+### 3. BUG-003: Lỗi cấp quyền thư mục `Permission denied` khi tạo cache EPUB
+- **Môi trường**: Android Termux (Giải nén từ file ZIP hoặc copy từ bộ nhớ máy).
+- **Hiện tượng**:
+  ```text
+  PermissionError: [Errno 13] Permission denied: '/data/data/com.termux/files/home/ztruyen/backend/data/cache/epubs'
+  ```
+- **Nguyên nhân gốc rễ (Root Cause)**:
+  - Khi file ZIP được giải nén hoặc copy từ bộ nhớ chia sẻ `/sdcard`, các thư mục có thể bị gán cờ quyền chỉ đọc (Read-only / `chmod 555`) hoặc thiếu quyền ghi `w`. Khi FastAPI khởi động, `ObjectStorage.ensure_directories()` cố gắng tạo thư mục con `cache/epubs` thì bị hệ điều hành Android từ chối.
+- **Cách khắc phục**:
+  1. Cấp lại toàn quyền đọc/ghi/thực thi cho thư mục dự án:
+     ```bash
+     chmod -R u+rwx ~/ztruyen
+     ```
+  2. Tự động hóa: Đã bổ sung lệnh tự động sửa quyền `chmod -R u+rwx` ngay đầu script `start-server.sh`.
+
+---
+
+### 4. BUG-004: Lỗi lệnh `ip: command not found` trên Termux Shell
+- **Môi trường**: Android Termux cơ bản (chưa cài `iproute2`).
+- **Hiện tượng**:
+  ```text
+  start-server.sh: line 32: ip: command not found
+  ```
+- **Nguyên nhân gốc rễ**: Lệnh `ip` thuộc gói `iproute2` không có sẵn mặc định trên một số bản cài đặt Termux rút gọn.
+- **Cách khắc phục**:
+  - Cập nhật script `start-server.sh` để kiểm tra có `ip` hoặc `ifconfig` trước khi chạy, tránh văng lỗi trên màn hình.
+
+### 5. BUG-005: Giao diện Web Catalog bị bung chiều ngang trên màn hình điện thoại
+- **Môi trường**: Trình duyệt di động (Brave / Chrome trên Android).
+- **Hiện tượng**:
+  - Modal danh sách tập truyện bị tràn viền phải, nút "Tải EPUB" bị cắt một nửa.
+  - Phải dùng tay zoom nhỏ lại mới nhìn được toàn bộ trang.
+- **Nguyên nhân gốc rễ (Root Cause)**:
+  - Thiếu thẻ `viewport-fit=cover` và `maximum-scale=1.0, user-scalable=no`.
+  - Layout `.volume-item` dùng `display: flex; justify-content: space-between` dạng hàng ngang với tiêu đề truyện dài, đẩy nút bấm ra ngoài biên màn hình (< 400px).
+- **Cách khắc phục**:
+  - Tái cấu trúc CSS mobile-first: Chuyển `.volume-item` trên mobile sang xếp dọc (`flex-direction: column`), nút bấm full-width dễ chạm ngón tay.
+  - Thêm `overflow-x: hidden` trên toàn bộ thẻ `html, body`.
+  - Tối ưu thanh Quick Nav cuộn ngang mượt mà (`overflow-x: auto; -webkit-overflow-scrolling: touch;`).
+
+---
+
+### 6. BUG-006: Nút "Tải EPUB" không có phản hồi thị giác và cào phân trang chậm
+- **Môi trường**: Tải các truyện có số lượng chương lớn (ví dụ: *Vô Địch Thiên Đế* với 3,871 chương).
+- **Hiện tượng**: Bấm nút Tải EPUB thì trang đứng im, không thấy tải về hoặc tưởng bị đơ.
+- **Nguyên nhân gốc rễ (Root Cause)**:
+  1. Thẻ `<a download>` truyền thống không có trạng thái chờ (loading spinner). Trong khi server phải cào và nén 50 chương (mất 5 - 10 giây), trình duyệt không hiển thị tiến trình.
+  2. Hàm `get_all_chapters` của scraper `storyaclick` duyệt tuần tự 39 trang danh sách chương khiến thời gian khởi tạo mất thêm 9 giây.
+- **Cách khắc phục**:
+  1. Chuyển hàm `get_all_chapters` sang tải phân trang **song song** (Concurrent Gather qua Semaphore), rút ngắn thời gian nạp 3,900 chương từ 9s xuống **< 1s**.
+  2. Viết lại nút tải trong Web UI bằng JavaScript `startDownload()` tương tác:
+     - Khi bấm: Nút lập tức đổi thành `⏳ Đang cào & nén...` và hiện hiệu ứng chờ.
+     - Khi nén xong: Tự động kích hoạt tải file `.epub` về máy và đổi nút sang `✅ Đã tải về!`.
+     - Nếu có lỗi máy chủ: Tự động bắt mã lỗi và hiển thị cửa sổ thông báo chi tiết (`alert`) thay vì im lặng.
+
+---
+
+## 🚀 3. Đánh Giá Trải Nghiệm & Đề Xuất Kiến Trúc Cài Đặt 1-Click Cho Người Dùng Cuối
+
+### Vấn đề hiện tại:
+- Quá trình biên dịch mã nguồn C/C++/Rust (`pydantic-core`, `selectolax`, `Pillow`, `zeroconf`) trực tiếp trên CPU điện thoại tốn nhiều thời gian (khoảng 3 - 8 phút), gây nóng máy và phụ thuộc vào kết nối repo.
+- Thao tác dòng lệnh Termux chỉ phù hợp cho giai đoạn phát triển (Dev/Test), chưa thân thiện với người dùng không chuyên.
+
+### Lộ trình tối ưu hóa (Roadmap to 1-Click):
+
+1. **Giải pháp Cấp 1 (Pre-built Wheels Offline Bundle - Giảm thời gian cài xuống 5 giây)**:
+   - Đóng gói toàn bộ các file `.whl` kiến trúc `aarch64` đã biên dịch xong vào thư mục `wheels/` trong file ZIP.
+   - Khi cài đặt, pip chỉ cần chạy: `pip install --no-index --find-links=wheels/ -r requirements.txt`.
+   - Kết quả: Không cần tải từ mạng, không cần cài `rust/clang/make`, cài đặt hoàn tất ngay tức thì.
+
+2. **Giải pháp Cấp 2 (Android Native App .APK 1-Click - Giải pháp Tối thượng cho End-User)**:
+   - Đóng gói toàn bộ Z-Truyen Backend thành 1 file **`ZTruyen-X3.apk`** độc lập (sử dụng Android Foreground Service).
+   - Giao diện người dùng:
+     - Nút to: **[ BẬT SERVER ]** / **[ TẮT SERVER ]**.
+     - Hiển thị địa chỉ mDNS `http://ztruyen.local:8080/opds`, địa chỉ IP và mã QR.
+   - Người dùng chỉ cần tải APK -> Cài đặt -> Mở app bấm 1 nút là X3 có thể kết nối ngay, 0% dòng lệnh.
+
+---
+*Tài liệu này sẽ tiếp tục được cập nhật tự động sau mỗi lần test thực tế.*
