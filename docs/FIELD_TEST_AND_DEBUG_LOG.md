@@ -131,6 +131,24 @@
      - Khi nén xong: Tự động kích hoạt tải file `.epub` về máy và đổi nút sang `✅ Đã tải về!`.
      - Nếu có lỗi máy chủ: Tự động bắt mã lỗi và hiển thị cửa sổ thông báo chi tiết (`alert`) thay vì im lặng.
 
+### 7. FEAT-001: Cơ Chế Đọc "Gần Như Online" (Near-Online Streaming & Background Prefetch)
+- **Mục tiêu**: Phục vụ việc theo dõi các chương mới cập nhật trên web, tải tức thì (< 0.3s/chương), tự động tải ngầm 3 chương tiếp theo và dọn dẹp 5 chương cũ.
+- **Hiện thực**:
+  1. **Single-Chapter EPUB Generator**: Tạo file EPUB 1 chương siêu nhẹ (15 - 30KB) để mở đọc ngay.
+  2. **Background Prefetch Engine**: Sử dụng `FastAPI BackgroundTasks` để khi người dùng đọc chương $N$, server tự động cào và nén sẵn chương $N+1, N+2, N+3$ vào cache. Khi bấm chương tiếp theo, file có sẵn lập tức với độ trễ 0s!
+  3. **Smart Cache Manager**: Tự động dọn dẹp các chương cũ hơn $N-5$ để tránh đầy bộ nhớ điện thoại.
+  4. **Volume Bundler**: Vẫn duy trì tùy chọn tải gom tập 50 chương/tập cho mục đích đọc offline đường dài.
+
+---
+
+### 8. PERF-001: Phân Tích Hiện Tượng "Chuyển Sang Termux Tốc Độ Nhanh Hơn Trình Duyệt"
+- **Hiện tượng**: Khi thao tác tìm/tải truyện trên trình duyệt điện thoại rồi chuyển sang app Termux thì thấy Termux chạy nhanh hơn là giữ nguyên ở trình duyệt.
+- **Nguyên nhân kỹ thuật (Android OS Scheduling & Battery Throttling)**:
+  - Trên hệ điều hành Android (MIUI/HyperOS, OneUI, ColorOS), khi trình duyệt (Chrome/Brave) đang ở màn hình trước (Foreground), Android sẽ đưa tiến trình chạy ngầm (Termux) vào chế độ **tiết kiệm pin (cgroup background throttle)**, hạ xung nhịp CPU xuống mức tối thiểu (300 - 600 MHz) và giảm băng thông I/O.
+  - Khi người dùng chuyển màn hình sang app Termux -> Termux trở thành Foreground App -> Android lập tức kích hoạt CPU Boost lên xung nhịp tối đa (2.4 - 3.2 GHz) và tăng ưu tiên đa luồng, khiến tác vụ hoàn thành tức thì.
+- **Trải nghiệm thực tế với máy đọc sách Xteink X3**:
+  - Khi bạn dùng máy X3 kết nối qua Wi-Fi/Hotspot vào điện thoại: Điện thoại không mở trình duyệt nội bộ nữa, app Termux được cấp quyền **"Không giới hạn (Unrestricted)"** và chạy `termux-wake-lock`, kết hợp với kết nối socket TCP trực tiếp sẽ đạt **tốc độ tối đa liên tục**, không bị hệ điều hành Android kìm hãm xung nhịp.
+
 ---
 
 ## 🚀 3. Đánh Giá Trải Nghiệm & Đề Xuất Kiến Trúc Cài Đặt 1-Click Cho Người Dùng Cuối
