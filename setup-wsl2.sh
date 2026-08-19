@@ -1,34 +1,27 @@
 #!/bin/bash
-# setup-ztruyen-wsl2.sh
-# Setup script for Z-Truyen on WSL2 Ubuntu
+# setup-wsl2.sh
+# Automated setup script for CrossPoint Simulator & Z-Truyen on WSL2 Ubuntu
 
 set -e
 
-echo "========================================"
-echo "  Z-Truyen X3 - WSL2 Setup"
-echo "========================================"
+echo "======================================================"
+echo "  Z-Truyen X3 - WSL2 CrossPoint Virtual Machine Setup "
+echo "======================================================"
 echo ""
 
-# Check if running in WSL
+# 1. Check if running in WSL
 if ! grep -qEi "(microsoft|wsl)" /proc/version 2>/dev/null; then
-    echo "Error: This script must be run in WSL2"
-    echo "On Windows, run: wsl -d Ubuntu-22.04"
+    echo "Error: This script must be run inside WSL2 (Ubuntu)"
+    echo "On Windows, run: wsl -d Ubuntu"
     exit 1
 fi
 
-# Get username
-USERNAME=$(whoami)
-echo "Running as: $USERNAME"
+echo "Running as user: $(whoami)"
 echo ""
 
-# Step 1: Update packages
-echo "[1/8] Updating packages..."
-sudo apt update && sudo apt upgrade -y
-echo "Done."
-echo ""
-
-# Step 2: Install dependencies
-echo "[2/8] Installing dependencies..."
+# 2. Update packages & install dependencies
+echo "[1/5] Installing OS dependencies (SDL2, OpenSSL, GCC, Python, Git)..."
+sudo apt update
 sudo apt install -y \
     python3 \
     python3-pip \
@@ -46,182 +39,104 @@ sudo apt install -y \
     cmake \
     g++ \
     net-tools \
-    netcat
-echo "Done."
+    libx11-dev
+
+echo "[OK] OS packages installed."
 echo ""
 
-# Step 3: Install PlatformIO
-echo "[3/8] Installing PlatformIO..."
+# 3. Install PlatformIO
+echo "[2/5] Installing PlatformIO Core..."
 if ! command -v pio &> /dev/null; then
-    python3 -m venv ~/.venvs/pio
-    source ~/.venvs/pio/bin/activate
-    pip install --upgrade pip
-    pip install platformio
-    echo "PlatformIO installed."
-else
-    echo "PlatformIO already installed."
+    pip install --break-system-packages platformio || pip install platformio
 fi
+echo "[OK] PlatformIO ready: $(pio --version)"
 echo ""
 
-# Step 4: Clone/Copy Backend
-echo "[4/8] Setting up Z-Truyen Backend..."
-WORKSPACE="$HOME/workspace"
-mkdir -p "$WORKSPACE"
-
-if [ -d "$WORKSPACE/ztruyen-backend" ]; then
-    echo "Backend already exists. Updating..."
-    cd "$WORKSPACE/ztruyen-backend"
-    git pull
-else
-    echo "Please enter the path to your Z-Truyen backend folder"
-    echo "Or press Enter to clone from Git:"
-    read -p "Backend path/Git URL: " backend_path
-
-    if [ -z "$backend_path" ]; then
-        echo "Please manually copy your backend to: $WORKSPACE/ztruyen-backend"
-    elif [[ "$backend_path" == http* ]]; then
-        git clone "$backend_path" "$WORKSPACE/ztruyen-backend"
-    else
-        cp -r "$backend_path" "$WORKSPACE/ztruyen-backend"
-    fi
-fi
-echo ""
-
-# Step 5: Setup Python venv
-echo "[5/8] Setting up Python environment..."
-cd "$WORKSPACE/ztruyen-backend"
-
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
+# 4. Clone or update CrossPoint Reader firmware
+echo "[3/5] Setting up CrossPoint Reader repository..."
+TARGET_DIR="$HOME/crosspoint-reader"
+if [ ! -d "$TARGET_DIR" ]; then
+    git clone https://github.com/crosspoint-reader/crosspoint-reader.git "$TARGET_DIR"
 fi
 
-source venv/bin/activate
-pip install --upgrade pip
-pip install fastapi uvicorn httpx lxml ebooklib Pillow pytest pytest-asyncio
-pip install -e .
+cd "$TARGET_DIR"
 
-echo "Python environment ready."
-echo ""
+# 5. Build simulator
+echo "[4/5] Building CrossPoint X3 Simulator binary..."
+mkdir -p sdcard/.fonts sdcard/books fs_/.fonts fs_/books fs_/.crosspoint
+cp lib/EpdFont/builtinFonts/source/Ubuntu/Ubuntu-Vietnamese-*.ttf fs_/.fonts/ 2>/dev/null || true
+cp lib/EpdFont/builtinFonts/source/NotoSans/NotoSans-*.ttf fs_/.fonts/ 2>/dev/null || true
 
-# Step 6: Clone CrossPoint Simulator
-echo "[6/8] Setting up CrossPoint Simulator..."
-if [ ! -d "$WORKSPACE/crosspoint-simulator" ]; then
-    cd "$WORKSPACE"
-    git clone https://github.com/crosspoint-reader/crosspoint-simulator.git
-fi
-
-echo "Simulator cloned to: $WORKSPACE/crosspoint-simulator"
-echo ""
-
-# Step 7: Create startup scripts
-echo "[7/8] Creating startup scripts..."
-
-# Backend start script
-cat > "$HOME/start-backend.sh" << 'EOF'
-#!/bin/bash
-cd ~/workspace/ztruyen-backend
-source venv/bin/activate
-
-IP=$(hostname -I | awk '{print $1}')
-
-echo "========================================"
-echo "  Z-Truyen Backend"
-echo "========================================"
-echo ""
-echo "OPDS URL: http://$IP:8080/opds"
-echo "mDNS:     http://ztruyen.local:8080/opds"
-echo ""
-echo "Press Ctrl+C to stop"
-echo "========================================"
-echo ""
-
-uvicorn ztruyen_backend.main:app --host 0.0.0.0 --port 8080
-EOF
-
-chmod +x "$HOME/start-backend.sh"
-
-# Simulator start script
-cat > "$HOME/start-simulator.sh" << 'EOF'
-#!/bin/bash
-cd ~/workspace/crosspoint-simulator
-
-echo "========================================"
-echo "  CrossPoint Simulator"
-echo "========================================"
-echo ""
-echo "Building simulator..."
 pio run -e simulator_x3
 
+# 6. Configure launcher script
+echo "[5/5] Configuring startup script..."
+cat > "$TARGET_DIR/run_simulator.sh" << 'EOF'
+#!/usr/bin/env bash
+set -e
+
+export DISPLAY="${DISPLAY:-:0}"
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/mnt/wslg/runtime-dir}"
+export PULSE_SERVER="${PULSE_SERVER:-unix:/mnt/wslg/PulseServer}"
+
+cd ~/crosspoint-reader
+
+mkdir -p sdcard/.fonts sdcard/books fs_/.fonts fs_/books fs_/.crosspoint
+cp lib/EpdFont/builtinFonts/source/Ubuntu/Ubuntu-Vietnamese-*.ttf fs_/.fonts/ 2>/dev/null || true
+cp lib/EpdFont/builtinFonts/source/NotoSans/NotoSans-*.ttf fs_/.fonts/ 2>/dev/null || true
+
+HOST_IP=$(ip route show | grep default | awk '{print $3}' | head -n1)
+[ -z "$HOST_IP" ] && HOST_IP="127.0.0.1"
+
+cat > fs_/.crosspoint/opds.json << OPDS_EOF
+{
+  "servers": [
+    {
+      "name": "Z-Truyen (Localhost)",
+      "url": "http://127.0.0.1:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "Z-Truyen (WSL Gateway)",
+      "url": "http://${HOST_IP}:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "Z-Truyen (Android Hotspot)",
+      "url": "http://192.168.43.1:8080/opds",
+      "username": "",
+      "password_obf": ""
+    }
+  ]
+}
+OPDS_EOF
+
+echo "======================================================"
+echo "    CROSSPOINT READER - XTEINK X3 DESKTOP EMULATOR    "
+echo "======================================================"
+echo " [!] Device Profile: Xteink X3 (792x528 E-ink Framebuffer)"
+echo " [!] Key Controls:"
+echo "     - Arrow Keys: Navigate / Turn Pages"
+echo "     - Enter / Space: Select / Open Book"
+echo "     - ESC / Backspace: Back"
+echo "     - Left Click: Touch / Swipe"
+echo "     - P key: Power / Sleep"
+echo " [!] OPDS Server: http://127.0.0.1:8080/opds"
+echo "======================================================"
 echo ""
-echo "Starting simulator..."
-pio run -e simulator_x3 -t upload
+
+exec ./.pio/build/simulator_x3/program
 EOF
 
-chmod +x "$HOME/start-simulator.sh"
-
-# Quick start (both)
-cat > "$HOME/start-ztruyen.sh" << 'EOF'
-#!/bin/bash
-echo "========================================"
-echo "  Z-Truyen + Simulator"
-echo "========================================"
-
-# Get IP
-IP=$(hostname -I | awk '{print $1}')
+chmod +x "$TARGET_DIR/run_simulator.sh"
 
 echo ""
-echo "Backend: http://$IP:8080/opds"
-echo "Simulator: pio run -e simulator_x3 -t upload"
-echo ""
-echo "Starting backend in background..."
-echo ""
-
-# Start backend
-cd ~/workspace/ztruyen-backend
-source venv/bin/activate
-uvicorn ztruyen_backend.main:app --host 0.0.0.0 --port 8080 &
-BACKEND_PID=$!
-
-echo "Backend started (PID: $BACKEND_PID)"
-echo ""
-echo "Press Ctrl+C to stop both"
-echo "========================================"
-
-# Wait for interrupt
-trap "kill $BACKEND_PID 2>/dev/null; exit" INT TERM
-wait
-EOF
-
-chmod +x "$HOME/start-ztruyen.sh"
-
-echo "Scripts created:"
-echo "  ~/start-backend.sh    - Start backend only"
-echo "  ~/start-simulator.sh - Start simulator only"
-echo "  ~/start-ztruyen.sh   - Start both"
-echo ""
-
-# Step 8: Verify
-echo "[8/8] Verifying installation..."
-cd "$WORKSPACE/ztruyen-backend"
-source venv/bin/activate
-
-echo "Testing backend..."
-timeout 5 python -c "
-from ztruyen_backend.main import app
-print('Backend module: OK')
-" 2>/dev/null && echo "Backend: OK" || echo "Backend: FAILED"
-
-echo ""
-echo "========================================"
-echo "  Setup Complete!"
-echo "========================================"
-echo ""
-echo "Quick Start:"
-echo "  1. Run: ~/start-backend.sh"
-echo "  2. Copy WSL IP shown"
-echo "  3. In simulator: Settings > OPDS > Add Server"
-echo "  4. URL: http://<IP>:8080/opds"
-echo ""
-echo "Or run both: ~/start-ztruyen.sh"
-echo ""
-echo "========================================"
+echo "======================================================"
+echo "  CROSSPOINT VIRTUAL MACHINE SETUP COMPLETE!"
+echo "======================================================"
+echo "  Run simulator via: ~/crosspoint-reader/run_simulator.sh"
+echo "  Or from Windows: double-click run_crosspoint_x3.bat"
+echo "======================================================"

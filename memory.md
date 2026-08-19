@@ -9,7 +9,7 @@
 
 ## 🚀 1. TRẠNG THÁI HIỆN TẠI (CURRENT PROJECT STATE)
 
-1. **Kiểm thử toàn diện**: **28/28 test cases PASS 100%** (`python -m pytest tests -v`).
+1. **Kiểm thử toàn diện**: **28/28 test cases PASS 100%** (`python -m pytest backend/tests -v`).
 2. **Pocket Host Server trên Android (Termux)**:
    - Đã cài đặt và vận hành ổn định trên điện thoại Android thực tế (`aarch64`, Python 3.14).
    - Tích hợp lệnh khởi chạy `ztruyen` và lệnh tự động cập nhật code không xung đột `ztruyen-update` (`android/update.sh`).
@@ -23,11 +23,12 @@
    - Chọn nguồn: `Tất cả nguồn`, `Storya.click`, `AkayTruyen`, `Con Đường Bá Chủ`.
    - Bộ lọc danh mục: `🔥 Truyện Hot`, `⚡ Mới Cập Nhật`, `✅ Hoàn Thành (Full Trọn Bộ)`.
    - Sắp xếp chương: `⬆️ Từ đầu (1 ➔ N)` $\leftrightarrow$ `⬇️ Mới nhất (N ➔ 1)`.
-5. **Máy ảo Xteink X3 Simulator 1-Click trên Windows Desktop**:
-   - Khởi chạy 1-click qua `run_x3_simulator.bat` (Python native UTF-8).
-   - Kết nối trực tiếp qua IP Wi-Fi/Hotspot của điện thoại (hoặc localhost).
-   - Tự động lưu file EPUB tải về vào thư mục `downloads/`.
-   - Tích hợp trình đọc E-ink Terminal Reader trực tiếp (lật trang bằng Enter / N / P).
+5. **Máy ảo Xteink X3 Đồ họa Thật (CrossPoint Reader Native Virtual Machine trên WSL2/WSLg)**:
+   - Sử dụng mã nguồn chính thức [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) + [CrossPoint Simulator](https://github.com/crosspoint-reader/crosspoint-simulator).
+   - Khởi chạy 1-Click qua `run_crosspoint_x3.bat`, `run_x3_simulator.bat`, hoặc `.\scripts\run_crosspoint_x3.ps1`.
+   - Hiển thị cửa sổ đồ họa E-ink thực thụ (792 × 528 pixel) trực tiếp trên Windows Desktop qua WSLg.
+   - Hỗ trợ đầy đủ phím cứng (D-pad Mũi tên, Enter/Space, ESC/Back, Nguồn P) và cảm ứng chuột.
+   - Tự động nạp sẵn cấu hình OPDS (`http://127.0.0.1:8080/opds`, `http://<WSL_GATEWAY>:8080/opds`, `http://192.168.43.1:8080/opds`) và Font tiếng Việt `Ubuntu-Vietnamese`.
 
 ---
 
@@ -61,7 +62,7 @@
                │        XTEINK X3 (MÁY THẬT HOẶC MÁY ẢO WINDOWS)         │
                │                                                         │
                │  - Máy thật: OPDS Browser CrossVi 1.1.2 / KOReader      │
-               │  - Máy ảo PC: run_x3_simulator.bat                      │
+               │  - Máy ảo PC: run_crosspoint_x3.bat (CrossPoint VM GUI) │
                │  - Duyệt Hot/New/Full, lọc theo Nguồn                   │
                │  - Tải từng chương lẻ (0.3s) / Gom 1-32 / Gom Trọn Bộ   │
                │  - Tải Tập 50 chương chuẩn hóa KOSync SHA-1             │
@@ -79,6 +80,6 @@
 2. **Nâng cấp gói cài đặt 1-Click APK (Roadmap Cấp 2)**:
    - Nghiên cứu đóng gói Z-Truyen Backend thành file `.apk` độc lập (sử dụng Python-for-Android / Kivy / Termux GUI wrapper) để người dùng không chuyên chỉ cần bấm 1 nút là mở server.
 3. **Quy trình làm việc chuẩn cho Agent**:
-   - Khi sửa code, luôn chạy test: `python -m pytest tests -v` (đảm bảo 28/28 tests PASS).
+   - Khi sửa code, luôn chạy test: `python -m pytest backend/tests -v` (đảm bảo 28/28 tests PASS).
    - Tự động `git add`, `git commit` và `git push origin main`.
    - Báo người dùng cập nhật trên điện thoại bằng đúng 1 lệnh: `ztruyen-update`.
