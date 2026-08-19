@@ -226,7 +226,8 @@ class OpdsBuilder:
         """Construct Story Detail Feed with all Acquisition Options: Single-chapter, Volumes, Full story."""
         now = format_iso_time(story.updated_at)
         escaped_title = html.escape(story.title)
-        escaped_author = html.escape(story.author)
+        clean_author = story.title if (not story.author or story.author == "Đang cập nhật") else story.author
+        escaped_author = html.escape(clean_author)
         escaped_desc = html.escape(story.description or f"Tác phẩm {story.title}")
         feed_id = f"urn:ztruyen:book:{story.source_id}:{story.slug}"
         self_url = f"{base_url}/opds/book/{story.source_id}/{story.slug}"
@@ -266,7 +267,7 @@ class OpdsBuilder:
         # 3. ĐỌC NGAY CHƯƠNG 1 (TRỰC TIẾP 1-CLICK)
         c1_url = f"{base_url}/opds/download/{story.source_id}/{story.slug}/ztruyen_{story.source_id}_{story.slug}_c0001.epub"
         entries.append(f"""    <entry>
-        <title>📖 Đọc Ngay Chương 1 (Chương Mở Đầu)</title>
+        <title>{escaped_title} — Chương 1</title>
         <id>urn:ztruyen:chapter:{story.source_id}:{story.slug}:c0001</id>
         <updated>{now}</updated>
         <author><name>{escaped_author}</name></author>
@@ -279,7 +280,7 @@ class OpdsBuilder:
         total_ch = story.total_chapters or (volume_slices[-1]["end_order"] if volume_slices else 1)
         all_url = f"{base_url}/opds/download/{story.source_id}/{story.slug}/ztruyen_{story.source_id}_{story.slug}_all.epub"
         entries.append(f"""    <entry>
-        <title>📥 Tải Trọn Bộ (Full {total_ch} Chương)</title>
+        <title>{escaped_title} — Trọn Bộ ({total_ch} Chương)</title>
         <id>urn:ztruyen:volume:{story.source_id}:{story.slug}:all</id>
         <updated>{now}</updated>
         <author><name>{escaped_author}</name></author>
@@ -293,7 +294,7 @@ class OpdsBuilder:
             vol_idx = s["vol_index"]
             start_ch = s["start_order"]
             end_ch = s["end_order"]
-            vol_title = f"📦 Tập {vol_idx:02d} (Chương {start_ch} - {end_ch})"
+            vol_title = f"{story.title} — Tập {vol_idx:02d} (Chương {start_ch}-{end_ch})"
             vol_filename = f"ztruyen_{story.source_id}_{story.slug}_v{vol_idx:02d}.epub"
             download_url = f"{base_url}/opds/download/{story.source_id}/{story.slug}/{vol_filename}"
             vol_id = f"urn:ztruyen:volume:{story.source_id}:{story.slug}:v{vol_idx:02d}"
@@ -342,7 +343,8 @@ class OpdsBuilder:
         """Construct Story Detail Feed listing individual chapters for near-online instant reading."""
         now = format_iso_time(story.updated_at)
         escaped_title = html.escape(story.title)
-        escaped_author = html.escape(story.author)
+        clean_author = story.title if (not story.author or story.author == "Đang cập nhật") else story.author
+        escaped_author = html.escape(clean_author)
         escaped_desc = html.escape(story.description or f"Tác phẩm {story.title}")
         feed_id = f"urn:ztruyen:book:{story.source_id}:{story.slug}:chapters:{sort_order}"
         self_url = f"{base_url}/opds/book/{story.source_id}/{story.slug}/chapters?sort={sort_order}"
@@ -356,17 +358,18 @@ class OpdsBuilder:
         entries: list[str] = []
         for c in chapters:
             order = getattr(c, "order", 1)
-            title = getattr(c, "title", f"Chương {order}")
+            raw_title = getattr(c, "title", f"Chương {order}")
+            chap_display_title = f"{story.title} — {raw_title}"
             chap_filename = f"ztruyen_{story.source_id}_{story.slug}_c{order:04d}.epub"
             download_url = f"{base_url}/opds/download/{story.source_id}/{story.slug}/{chap_filename}"
             chap_id = f"urn:ztruyen:chapter:{story.source_id}:{story.slug}:c{order:04d}"
 
             entry = f"""    <entry>
-        <title>{html.escape(title)}</title>
+        <title>{html.escape(chap_display_title)}</title>
         <id>{chap_id}</id>
         <updated>{now}</updated>
         <author><name>{escaped_author}</name></author>
-        <summary type="text">Chương {order} ({story.title}). Tải tức thì 0.3s &amp; tự động tải ngầm 3 chương kế tiếp.</summary>
+        <summary type="text">{escaped_title} — Chương {order}. Tải tức thì 0.3s &amp; tự động tải ngầm 3 chương kế tiếp.</summary>
         <link rel="http://opds-spec.org/acquisition"
               href="{download_url}"
               type="application/epub+zip"

@@ -266,15 +266,26 @@ class AkayTruyenAdapter:
         return all_chapters
 
     async def get_chapter_content(self, story_slug: str, chap_slug: str) -> ChapterContent:
-        url = f"{self.base_url}/truyen/{story_slug}/{chap_slug}"
         cookies = self.session_manager.get_cookies(self.id)
+        
+        # 1. Try standard akaytruyen chapter URL: /{story_slug}/{chap_slug}
+        url = f"{self.base_url}/{story_slug}/{chap_slug}"
         resp = await self.client.get(url, headers=self._get_headers(), cookies=cookies)
+        
+        # 2. Fallback to /truyen/{story_slug}/{chap_slug} if 404
+        if resp.status_code == 404 or "404 Not Found" in resp.text:
+            alt_url = f"{self.base_url}/truyen/{story_slug}/{chap_slug}"
+            resp = await self.client.get(alt_url, headers=self._get_headers(), cookies=cookies)
+            if resp.status_code == 200 and "404 Not Found" not in resp.text:
+                url = alt_url
 
-        if "access-denied-container" in resp.text or "Chương này dành cho tài khoản VIP" in resp.text:
-            raise PermissionError("Chương VIP bị khóa. Hãy đăng nhập tài khoản AkayTruyen.")
+        if resp.status_code != 200 or "404 Not Found" in resp.text:
+            raise ValueError(f"Không tìm thấy chương '{chap_slug}' trên AkayTruyen (HTTP {resp.status_code})")
 
         tree = HTMLParser(resp.text)
-        title_node = tree.css_first("h1.custom-text, h1, h2")
+        if tree.css_first(".access-denied-container") or "Chương này dành cho tài khoản VIP" in resp.text:
+            raise PermissionError("Chương VIP bị khóa. Hãy đăng nhập tài khoản AkayTruyen.")
+        title_node = tree.css_first("h1.custom-text, h1, h2, .chapter-title, .title-chap")
         title = title_node.text(strip=True) if title_node else chap_slug
 
         content_node = (
@@ -282,9 +293,13 @@ class AkayTruyenAdapter:
             or tree.css_first(".chapter-content")
             or tree.css_first("#chapter-c")
             or tree.css_first(".content-chap")
+            or tree.css_first(".reading-content")
         )
 
-        raw_html = content_node.html if content_node else resp.text
+        if not content_node:
+            raise ValueError(f"Không tìm thấy khối văn bản chương '{chap_slug}' từ {url}")
+
+        raw_html = content_node.html or ""
         clean_xhtml = sanitize_chapter_html(raw_html)
 
         order_match = re.search(r"(\d+)", title) or re.search(r"(\d+)", chap_slug)

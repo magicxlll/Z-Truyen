@@ -14,6 +14,7 @@ from app.domain.ids import (
 )
 from app.cache.metadata_repo import repo, MetadataRepository
 from app.cache.object_storage import storage, ObjectStorage
+from app.cache.cover_service import cover_service
 from app.sources.registry import registry, SourceRegistry
 from app.epub.builder import epub_builder, EpubBuilder
 from app.logging import logger, log_epub_event
@@ -142,15 +143,9 @@ class VolumeBundler:
             )
             chapters_to_compile = sorted(chapters_to_compile, key=lambda c: c.order_num)
 
-        # 4. Fetch cover bytes if available
-        cover_bytes: bytes | None = None
-        if story.cover_url:
-            try:
-                cover_resp = await adapter.client.get(story.cover_url)
-                if cover_resp.status_code == 200:
-                    cover_bytes = cover_resp.content
-            except Exception as e:
-                logger.warning(f"Could not download cover image from {story.cover_url}: {e}")
+        # 4. Fetch optimized E-ink JPEG cover bytes
+        cover_bytes = await self._get_cover_bytes(source_id, story_slug, story.title, story.cover_url)
+        clean_author = story.author if (story.author and story.author != "Đang cập nhật") else story.title
 
         # 5. Build EPUB
         volume_title = f"Tập {vol_index:02d} (Chương {start_order}-{end_order})"
@@ -159,7 +154,7 @@ class VolumeBundler:
         epub_bytes, sha1_hash = self.builder.build(
             identifier=identifier,
             title=story.title,
-            author=story.author,
+            author=clean_author,
             source_name=adapter.name,
             volume_title=volume_title,
             chapters=chapters_to_compile,
@@ -167,7 +162,7 @@ class VolumeBundler:
         )
 
         # 6. Save to disk cache and database
-        saved_file_path = self.storage.save_epub(filename, epub_bytes)
+        saved_file_path = self.storage.save_epub(filename, epub_bytes, story_slug=story_slug)
         bundle = VolumeBundle(
             id=build_volume_id(source_id, story_slug, vol_index),
             story_id=build_story_id(source_id, story_slug),
@@ -183,12 +178,29 @@ class VolumeBundler:
 
         return saved_file_path, sha1_hash
 
+    async def _get_cover_bytes(
+        self, source_id: str, story_slug: str, story_title: str, cover_url: str | None
+    ) -> bytes | None:
+        """Retrieve or generate optimized JPEG cover image bytes for EPUB embedding."""
+        try:
+            cover_path = await cover_service.get_or_create_cover(
+                source_id=source_id,
+                slug=story_slug,
+                cover_url=cover_url,
+                title=story_title,
+            )
+            if cover_path and cover_path.is_file():
+                return cover_path.read_bytes()
+        except Exception as e:
+            logger.warning(f"Could not prepare cover bytes for {source_id}:{story_slug}: {e}")
+        return None
+
     async def get_or_build_single_chapter(
         self, source_id: str, story_slug: str, chap_order: int
     ) -> tuple[Path, str]:
         """Build and cache a single-chapter EPUB for immediate reading."""
         filename = build_chapter_filename(source_id, story_slug, chap_order)
-        cached_path = self.storage.get_epub_path(filename)
+        cached_path = self.storage.get_epub_path(filename, story_slug=story_slug)
         if cached_path:
             sha1 = self.storage.calculate_file_sha1(cached_path)
             return cached_path, sha1
@@ -218,17 +230,22 @@ class VolumeBundler:
         )
         self.repo.upsert_chapter(domain_chap)
 
+        # Retrieve optimized JPEG cover
+        cover_bytes = await self._get_cover_bytes(source_id, story_slug, story.title, story.cover_url)
+        clean_author = story.author if (story.author and story.author != "Đang cập nhật") else story.title
+
         identifier = f"urn:ztruyen:{source_id}:{story_slug}:c{chap_order:04d}"
         epub_bytes, sha1_hash = self.builder.build(
             identifier=identifier,
             title=story.title,
-            author=story.author,
+            author=clean_author,
             source_name=adapter.name,
-            volume_title=f"Chương {chap_order}",
+            volume_title=f"Chương {chap_order}: {domain_chap.title}",
             chapters=[domain_chap],
+            cover_image_bytes=cover_bytes,
         )
 
-        saved_path = self.storage.save_epub(filename, epub_bytes)
+        saved_path = self.storage.save_epub(filename, epub_bytes, story_slug=story_slug)
         return saved_path, sha1_hash
 
     async def prefetch_and_cleanup(
@@ -347,14 +364,8 @@ class VolumeBundler:
             )
             chapters_to_compile = sorted(chapters_to_compile, key=lambda c: c.order_num)
 
-            cover_bytes: bytes | None = None
-            if story.cover_url:
-                try:
-                    cover_resp = await adapter.client.get(story.cover_url)
-                    if cover_resp.status_code == 200:
-                        cover_bytes = cover_resp.content
-                except Exception as e:
-                    logger.warning(f"Could not download cover: {e}")
+            cover_bytes = await self._get_cover_bytes(source_id, story_slug, story.title, story.cover_url)
+            clean_author = story.author if (story.author and story.author != "Đang cập nhật") else story.title
 
             if is_all or (actual_start_order == 1 and actual_end_order == total_chapters):
                 volume_title = f"Trọn Bộ ({total_chapters} Chương)"
@@ -366,14 +377,14 @@ class VolumeBundler:
             epub_bytes, sha1_hash = self.builder.build(
                 identifier=identifier,
                 title=story.title,
-                author=story.author,
+                author=clean_author,
                 source_name=adapter.name,
                 volume_title=volume_title,
                 chapters=chapters_to_compile,
                 cover_image_bytes=cover_bytes,
             )
 
-            saved_file_path = self.storage.save_epub(filename, epub_bytes)
+            saved_file_path = self.storage.save_epub(filename, epub_bytes, story_slug=story_slug)
             return saved_file_path, sha1_hash
 
 

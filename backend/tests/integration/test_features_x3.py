@@ -47,8 +47,8 @@ async def test_opds_book_multiple_acquisition_methods():
 
         # Check options
         assert "Đọc Từng Chương" in text
-        assert "Đọc Ngay Chương 1" in text
-        assert "Tải Trọn Bộ" in text
+        assert "Chương 1" in text
+        assert "Trọn Bộ" in text
         assert "Tập 01" in text
         assert "/opds/cover/conduongbachu/main" in text
 

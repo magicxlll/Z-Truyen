@@ -83,6 +83,18 @@ cat > fs_/.crosspoint/wifi.json << EOF
 }
 EOF
 
+# Ensure download folder is set to books
+if [ ! -f fs_/.crosspoint/settings.json ]; then
+    cat > fs_/.crosspoint/settings.json << EOF
+{
+  "opdsDownloadFolder": "books",
+  "opdsFilenameFormat": 0,
+  "fontSize": 14,
+  "language": "EN"
+}
+EOF
+fi
+
 echo "======================================================"
 echo "    CROSSPOINT READER - XTEINK X3 DESKTOP EMULATOR    "
 echo "======================================================"
