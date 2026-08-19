@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 
 router = APIRouter(tags=["Web UI"])
 
-WEB_HTML = """<!DOCTYPE html>
+WEB_HTML = r"""<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
@@ -645,10 +645,10 @@ WEB_HTML = """<!DOCTYPE html>
             <div class="search-box">
                 <input type="text" id="search-input" placeholder="Nhập tên truyện, tác giả (ví dụ: Vũ Động Càn Khôn, Con Đường Bá Chủ)..." />
                 <select id="source-select" onchange="onSourceChange()">
-                    <option value="">Tất cả nguồn</option>
-                    <option value="storyaclick">Storya.click</option>
-                    <option value="akaytruyen">AkayTruyen</option>
-                    <option value="conduongbachu">Con Đường Bá Chủ</option>
+                    <option value="">🌍 Tất cả nguồn truyện</option>
+                    <option value="storyaclick">📚 Storya (storya.click)</option>
+                    <option value="akaytruyen">🌟 AkayTruyen (akaytruyen.com)</option>
+                    <option value="conduongbachu">⚔️ Con Đường Bá Chủ (conduongbachu.com)</option>
                 </select>
                 <button onclick="performSearch()">Tìm Kiếm</button>
             </div>
@@ -691,6 +691,19 @@ WEB_HTML = """<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- Confirm Read Now Modal (Y/N) -->
+    <div id="confirm-read-modal" class="modal-overlay" style="display: none; z-index: 100;">
+        <div class="modal" style="max-width: 420px; padding: 1.5rem; text-align: center; border-radius: var(--radius); margin: auto;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📖</div>
+            <h3 id="confirm-read-title" style="margin-bottom: 0.5rem; font-size: 1.15rem; color: var(--text-main);">Tải Về Hoàn Tất!</h3>
+            <p id="confirm-read-desc" style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; line-height: 1.4;">File EPUB đã được tạo và lưu vào máy. Bạn có muốn mở đọc ngay bây giờ không?</p>
+            <div style="display: flex; gap: 0.75rem; justify-content: center;">
+                <button type="button" class="dl-btn" style="width: auto; padding: 0.55rem 1.4rem; background-color: var(--success); color: #ffffff;" onclick="readDownloadedBook()">📖 Đọc Ngay</button>
+                <button type="button" class="dl-btn" style="width: auto; padding: 0.55rem 1.4rem; background-color: var(--border); color: var(--text-main);" onclick="closeConfirmModal()">✖ Để Sau</button>
+            </div>
+        </div>
+    </div>
+
     <footer>
         <p>Z-Truyen X3 — Tương thích 100% OPDS Browser CrossVi 1.1.2 &amp; KOReader. Tự động tải ngầm 3 chương tiếp theo &amp; dọn dẹp bộ nhớ thông minh.</p>
     </footer>
@@ -707,6 +720,8 @@ WEB_HTML = """<!DOCTYPE html>
         let currentTab = 'chapters';
         let currentSort = 'asc'; // 'asc' = 1 -> N, 'desc' = N -> 1
         let cachedStoryVolumes = null;
+        let lastDownloadedBlobUrl = null;
+        let lastDownloadedFilename = '';
 
         function onSourceChange() {
             if (document.getElementById('search-input').value.trim()) {
@@ -761,7 +776,7 @@ WEB_HTML = """<!DOCTYPE html>
                     source = parts[0] || 'Nguồn';
                     slug = parts[1] || '';
                 } else if (subLink) {
-                    const match = subLink.match(/\\/book\\/([^\\/]+)\\/([^\\/]+)/);
+                    const match = subLink.match(/\/book\/([^\/]+)\/([^\/]+)/);
                     if (match) {
                         source = match[1];
                         slug = match[2];
@@ -771,7 +786,7 @@ WEB_HTML = """<!DOCTYPE html>
                 html += `
                     <div class="card" onclick="openStoryDetail('${source}', '${slug}', '${escapeHtml(title)}')">
                         <div class="cover-wrap">
-                            <span class="badge-source">${source}</span>
+                            <span class="badge-source">${source.toUpperCase()}</span>
                             <img src="${coverLink}" alt="${escapeHtml(title)}" onerror="this.src='https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300'"/>
                         </div>
                         <div class="card-body">
@@ -787,7 +802,7 @@ WEB_HTML = """<!DOCTYPE html>
         }
 
         function escapeHtml(str) {
-            return String(str || '').replace(/'/g, "\\\\'").replace(/"/g, '&quot;');
+            return String(str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         }
 
         function performSearch() {
@@ -852,7 +867,6 @@ WEB_HTML = """<!DOCTYPE html>
                     currentStoryData.slug = slug;
                     renderChaptersTab();
                 } else if (cachedStoryVolumes) {
-                    // Fallback to volumes if json chapters fail
                     currentStoryData = { source_id: source, slug: slug };
                     switchTab('volumes');
                 } else {
@@ -1020,6 +1034,25 @@ WEB_HTML = """<!DOCTYPE html>
             modalContent.innerHTML = bodyHtml;
         }
 
+        function showConfirmModal(filename, blobUrl) {
+            lastDownloadedBlobUrl = blobUrl;
+            lastDownloadedFilename = filename;
+            document.getElementById('confirm-read-title').innerText = '✅ Đã tải xong!';
+            document.getElementById('confirm-read-desc').innerText = `File "${filename}" đã được tải về máy. Bạn có muốn mở đọc ngay bây giờ không?`;
+            document.getElementById('confirm-read-modal').style.display = 'flex';
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirm-read-modal').style.display = 'none';
+        }
+
+        function readDownloadedBook() {
+            closeConfirmModal();
+            if (lastDownloadedBlobUrl) {
+                window.open(lastDownloadedBlobUrl, '_blank');
+            }
+        }
+
         async function startDownload(url, filename, el) {
             if (!url || url === '#') {
                 alert('Không tìm thấy link tải EPUB cho mục này.');
@@ -1057,17 +1090,14 @@ WEB_HTML = """<!DOCTYPE html>
                 document.body.appendChild(a);
                 a.click();
                 
-                setTimeout(() => {
-                    window.URL.revokeObjectURL(blobUrl);
-                    a.remove();
-                }, 1000);
-
                 if (isChapItem) {
                     el.innerHTML = '<div class="chap-item-title" style="color: var(--success);">✅ Đã mở</div><div class="chap-item-btn">Xong</div>';
                 } else {
                     el.classList.remove('downloading');
                     el.classList.add('success');
                     el.innerHTML = '<span>✅ Đã tải về!</span>';
+                    // Show confirmation modal for volumes/multi-chapter files
+                    showConfirmModal(filename, blobUrl);
                 }
 
                 setTimeout(() => {
@@ -1081,7 +1111,7 @@ WEB_HTML = """<!DOCTYPE html>
                 }, 2500);
 
             } catch (err) {
-                alert('⚠️ Lỗi khi tải EPUB:\\n' + err.message);
+                alert('⚠️ Lỗi khi tải EPUB:\n' + err.message);
                 if (isChapItem) {
                     el.innerHTML = originalContent;
                 } else {
@@ -1098,7 +1128,9 @@ WEB_HTML = """<!DOCTYPE html>
 
         window.onclick = function(e) {
             const modal = document.getElementById('detail-modal');
+            const confirmModal = document.getElementById('confirm-read-modal');
             if (e.target === modal) closeModal();
+            if (e.target === confirmModal) closeConfirmModal();
         };
 
         // Initial Load
