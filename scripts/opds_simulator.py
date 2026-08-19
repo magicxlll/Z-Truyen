@@ -254,7 +254,18 @@ class OpdsSimulator:
                 print("⚠️ Lựa chọn không hợp lệ, vui lòng thử lại!")
 
     def download_and_verify_epub(self, download_url: str, volume_title: str):
+        import os
+        import re
+        from pathlib import Path
+
         full_url = download_url if download_url.startswith("http") else f"{self.base_url}{download_url}"
+        filename = download_url.split("/")[-1] if "/" in download_url else "ztruyen_book.epub"
+        
+        # Thư mục lưu file trên máy ảo (tương đương thẻ nhớ MicroSD trên máy X3 thật)
+        download_dir = Path(__file__).resolve().parent.parent / "downloads"
+        download_dir.mkdir(parents=True, exist_ok=True)
+        save_path = download_dir / filename
+
         print(f"\n📥 Đang tải và đóng gói EPUB từ Server: {full_url} ...")
         t0 = time.time()
         try:
@@ -268,11 +279,16 @@ class OpdsSimulator:
             size_kb = len(epub_bytes) / 1024
             sha1 = r.headers.get("x-kosync-sha1", "N/A")
 
-            print(f"    ✅ Tải thành công trong {duration:.2f}s!")
-            print(f"    📦 Dung lượng: {size_kb:.2f} KB ({len(epub_bytes)} bytes)")
+            # 1. Lưu file thật vào thư mục downloads/
+            with open(save_path, "wb") as f:
+                f.write(epub_bytes)
+
+            print(f"\n    ✅ ĐÃ TẢI VỀ MÁY ẢO THÀNH CÔNG! (Thời gian: {duration:.2f}s)")
+            print(f"    📁 Vị trí lưu trên máy tính (Thẻ nhớ ảo): {save_path}")
+            print(f"    📦 Dung lượng file: {size_kb:.2f} KB ({len(epub_bytes)} bytes)")
             print(f"    🔑 Mã băm KOSync SHA-1: {sha1}")
 
-            # Đọc và xác minh file EPUB
+            # 2. Đọc và xác minh file EPUB
             book = epub.read_epub(io.BytesIO(epub_bytes))
             title = book.get_metadata("DC", "title")
             author = book.get_metadata("DC", "creator")
@@ -284,11 +300,78 @@ class OpdsSimulator:
             print(f"    - Tiêu đề sách: {title[0][0] if title else 'N/A'}")
             print(f"    - Tác giả: {author[0][0] if author else 'N/A'}")
             print(f"    - Ngôn ngữ: {lang[0][0] if lang else 'N/A'}")
-            print(f"    - Số lượng chương trong tập: {len(chaps)} chương")
+            print(f"    - Số lượng chương trong file: {len(chaps)} chương")
             print(f"    - Tương thích E-ink Xteink X3: 100% ĐẠT CHUẨN (<1MB, clean XHTML)")
+
+            # 3. Tùy chọn mở đọc ngay trên máy ảo hoặc mở thư mục
+            print("\n" + "-" * 55)
+            print("  📖 BẠN MUỐN LÀM GÌ TIẾP THEO?")
+            print("     [1] Đọc thử nội dung chương ngay trên máy ảo (E-ink Reader)")
+            print("     [2] Mở thư mục chứa file EPUB trên máy tính")
+            print("     [Enter] Quay lại menu")
+            print("-" * 55)
+            sub_choice = input("👉 Lựa chọn (1/2/Enter): ").strip()
+            
+            if sub_choice == "1" and chaps:
+                self.read_epub_terminal(chaps)
+            elif sub_choice == "2":
+                os.system(f'explorer.exe /select,"{save_path}"')
 
         except Exception as e:
             print(f"    ❌ Lỗi trong quá trình tải/xác minh EPUB: {e}")
+
+    def read_epub_terminal(self, chaps: list):
+        """Trình mô phỏng đọc sách E-ink trực tiếp trên terminal."""
+        import re
+        import textwrap
+
+        for c_idx, chap in enumerate(chaps, 1):
+            content_str = chap.get_content().decode("utf-8", errors="ignore")
+            
+            # Lọc bỏ các thẻ HTML để lấy văn bản thuần
+            clean_text = re.sub(r"<style.*?</style>", "", content_str, flags=re.DOTALL | re.IGNORECASE)
+            clean_text = re.sub(r"<script.*?</script>", "", clean_text, flags=re.DOTALL | re.IGNORECASE)
+            clean_text = re.sub(r"<h[1-6].*?>(.*?)</h[1-6]>", r"\n\n=== \1 ===\n\n", clean_text, flags=re.IGNORECASE)
+            clean_text = re.sub(r"<p.*?>", "\n  ", clean_text, flags=re.IGNORECASE)
+            clean_text = re.sub(r"<br\s*/?>", "\n", clean_text, flags=re.IGNORECASE)
+            clean_text = re.sub(r"<[^>]+>", "", clean_text)
+            clean_text = re.sub(r"\n{3,}", "\n\n", clean_text).strip()
+
+            paragraphs = clean_text.split("\n\n")
+            formatted_lines = []
+            for p in paragraphs:
+                wrapped = textwrap.fill(p.strip(), width=62, initial_indent="  ", subsequent_indent="  ")
+                formatted_lines.append(wrapped)
+
+            full_formatted = "\n\n".join(formatted_lines)
+            
+            # Chia trang (khoảng 22 dòng mỗi trang E-ink)
+            lines = full_formatted.split("\n")
+            lines_per_page = 20
+            pages = [lines[i:i + lines_per_page] for i in range(0, len(lines), lines_per_page)]
+            
+            if not pages:
+                pages = [["(Chương này chưa có nội dung chữ)"]]
+
+            p_idx = 0
+            while p_idx < len(pages):
+                print("\n" + "=" * 65)
+                print(f"  📖 MÀN HÌNH E-INK X3 | CHƯƠNG {c_idx}/{len(chaps)} | TRANG {p_idx + 1}/{len(pages)}")
+                print("=" * 65 + "\n")
+                
+                print("\n".join(pages[p_idx]))
+                
+                print("\n" + "-" * 65)
+                print(f"  [Enter] / [N] Trang sau | [P] Trang trước | [Q] Thoát đọc sách")
+                print("-" * 65)
+                
+                cmd = input("👉 Lật trang: ").strip().lower()
+                if cmd == "q":
+                    return
+                elif cmd == "p" and p_idx > 0:
+                    p_idx -= 1
+                else:
+                    p_idx += 1
 
 
 def main():
