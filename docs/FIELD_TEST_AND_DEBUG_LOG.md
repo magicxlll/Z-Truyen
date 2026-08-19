@@ -158,6 +158,33 @@
   1. Thêm đồng thời cả 2 route alias trong `books.py`: `@router.get("/api/book/{source_id}/{book_slug}")` và `@router.get("/api/book/{source_id}/{book_slug}/chapters")`.
   2. Nâng cấp hàm `openStoryDetail()` và `renderVolumesTab()` trong `web.py` với cơ chế tải song song `Promise.allSettled` nạp đồng thời cả danh sách chương lẻ và danh sách tập 50 chương, kèm cơ chế tự động chuyển tab dự phòng (fallback) nếu một trong hai gặp sự cố.
 
+### 10. BUG-008: Android Doze Mode & Background Process Freezing (Cơ Chế Khắc Phục Triệt Để)
+- **Triệu chứng**: Khi chuyển sang trình duyệt web hoặc tắt màn hình điện thoại, các yêu cầu tải từ máy đọc sách bị ngưng trệ, chỉ khi mở lại màn hình Termux thì hệ thống mới tiếp tục chạy.
+- **Nguyên nhân**: Hệ điều hành Android (Android 12+) tự động kích hoạt Phantom Process Killer và cgroup freezing đối với các ứng dụng nền không đăng ký Foreground Service với WakeLock mức hệ thống.
+- **Khắc phục**:
+  1. **Acquire WakeLock**: Người dùng kéo thanh thông báo điện thoại xuống $\rightarrow$ Bấm nút `Acquire wakelock` tại thông báo của Termux (trạng thái chuyển thành `Termux: (wake lock held)`).
+  2. **Lock in Recent Apps**: Khóa biểu tượng ổ khóa 🔒 cho Termux trong màn hình đa nhiệm.
+  3. **Battery Unrestricted**: Chuyển chế độ quản lý pin của Termux sang "Không giới hạn".
+  4. **Uvicorn Keep-Alive**: Cấu hình `--timeout-keep-alive 75 --limit-concurrency 100` để giữ luồng socket luôn sẵn sàng.
+
+---
+
+## 🖥️ 4. Hướng Dẫn Chạy Máy Ảo Xteink X3 Simulator 1-Click Trên Windows Desktop
+
+Để kiểm thử thực tế trải nghiệm duyệt thư viện và đọc sách của Xteink X3 trước khi nạp vào máy thật:
+
+### Cách 1: Chạy Máy Ảo E-Reader Simulator 1-Click (Khuyên dùng)
+1. Trên máy tính Windows, mở thư mục dự án `Z-Truyen`.
+2. Nhấp đúp chuột vào file **`run_x3_simulator.bat`**.
+3. Cửa sổ máy ảo X3 xuất hiện:
+   - Nếu bạn muốn kết nối với **Điện thoại Android**: Nhập địa chỉ IP của điện thoại (ví dụ: `http://192.168.43.1:8080` khi phát Hotspot hoặc `http://192.168.1.X:8080` khi chung Wi-Fi).
+   - Nếu bạn muốn kết nối với **Backend trên máy tính**: Chỉ cần nhấn `Enter` (dùng mặc định `http://localhost:8080`).
+4. Giao diện máy ảo X3 cho phép:
+   - Duyệt Truyện Hot, Mới Cập Nhật, Truyện Hoàn Thành.
+   - Tìm kiếm truyện toàn hệ thống.
+   - **Tải và đọc thử từng chương (Single-Chapter Streaming 0.3s)**.
+   - **Tải và kiểm tra độ chuẩn hóa EPUB gom tập (50 chương/tập)** với đầy đủ mã băm KOSync SHA-1.
+
 ---
 
 ## 🚀 3. Đánh Giá Trải Nghiệm & Đề Xuất Kiến Trúc Cài Đặt 1-Click Cho Người Dùng Cuối

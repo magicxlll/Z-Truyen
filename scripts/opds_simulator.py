@@ -93,19 +93,21 @@ class OpdsSimulator:
             return
 
         while True:
-            print("\n" + "-" * 50)
-            print("  📱 MENU ĐIỀU HƯỚNG OPDS BROWSER (XTEINK X3)")
-            print("-" * 50)
+            print("\n" + "-" * 55)
+            print("  📱 MENU ĐIỀU HƯỚNG OPDS BROWSER (MÁY ĐỌC SÁCH X3)")
+            print("-" * 55)
             print("  1. 🔥 Xem Truyện Hot / Đọc Nhiều (/opds/hot)")
             print("  2. ⚡ Xem Truyện Mới Cập Nhật (/opds/latest)")
-            print("  3. 📂 Xem Thể Loại Truyện (/opds/genres)")
-            print("  4. 🌐 Xem Danh Sách Nguồn Cào (/opds/sources)")
-            print("  5. 🔍 Tìm Kiếm Truyện Toàn Hệ Thống (/opds/search)")
-            print("  6. 🧪 Tải & Kiểm Thử Nhanh 1 Tập EPUB Mẫu (Con Đường Bá Chủ Tập 1)")
+            print("  3. ✅ Xem Truyện Đã Hoàn Thành Full (/opds/completed)")
+            print("  4. 📂 Xem Thể Loại Truyện (/opds/genres)")
+            print("  5. 🌐 Xem Danh Sách Nguồn Cào (/opds/sources)")
+            print("  6. 🔍 Tìm Kiếm Truyện Toàn Hệ Thống (/opds/search)")
+            print("  7. 🧪 Tải & Đọc Thử 1 Chương Tức Thì (0.3s Streaming Test)")
+            print("  8. 📦 Tải & Kiểm Thử 1 Tập EPUB 50 Chương (Con Đường Bá Chủ Tập 1)")
             print("  0. 🚪 Thoát")
-            print("-" * 50)
+            print("-" * 55)
 
-            choice = input("👉 Chọn chức năng (0-6): ").strip()
+            choice = input("👉 Chọn chức năng (0-8): ").strip()
             if choice == "0":
                 print("Tạm biệt!")
                 break
@@ -114,15 +116,19 @@ class OpdsSimulator:
             elif choice == "2":
                 self.show_story_list("/opds/latest", "Truyện Mới Cập Nhật")
             elif choice == "3":
-                self.show_navigation_feed("/opds/genres", "Thể Loại")
+                self.show_story_list("/opds/completed", "Truyện Hoàn Thành (Full)")
             elif choice == "4":
-                self.show_navigation_feed("/opds/sources", "Nguồn Cào")
+                self.show_navigation_feed("/opds/genres", "Thể Loại")
             elif choice == "5":
+                self.show_navigation_feed("/opds/sources", "Nguồn Cào")
+            elif choice == "6":
                 q = input("Nhập tên truyện / tác giả cần tìm: ").strip()
                 if q:
                     self.show_story_list(f"/opds/search?q={q}", f"Kết quả tìm kiếm: '{q}'")
-            elif choice == "6":
-                self.download_and_verify_epub("/opds/download/conduongbachu/main/ztruyen_conduongbachu_main_v01.epub", "Con Đường Bá Chủ - Tập 01")
+            elif choice == "7":
+                self.download_and_verify_epub("/opds/download/conduongbachu/main/ztruyen_conduongbachu_main_c0001.epub", "Con Đường Bá Chủ - Chương 1 (Single Chapter)")
+            elif choice == "8":
+                self.download_and_verify_epub("/opds/download/conduongbachu/main/ztruyen_conduongbachu_main_v01.epub", "Con Đường Bá Chủ - Tập 01 (50 Chương)")
             else:
                 print("Lựa chọn không hợp lệ, vui lòng thử lại!")
 
