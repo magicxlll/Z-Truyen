@@ -31,7 +31,7 @@ async def test_opds_root_sources_at_top():
         resp2 = await client.get("/opds")
         assert resp2.status_code == 200
         assert "Đọc Tiếp: Mục Thần Ký" in resp2.text
-        assert "/opds/book/storyaclick/muc-than-ky/chapters?start=5&limit=50&sort=asc" in resp2.text
+        assert "/opds/book/storyaclick/muc-than-ky/chapters?start=5&amp;limit=50&amp;sort=asc" in resp2.text
 
 
 @pytest.mark.asyncio
