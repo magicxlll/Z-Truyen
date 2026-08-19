@@ -28,10 +28,10 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM EXIT
 
-# Đảm bảo toàn quyền đọc/ghi cho thư mục dữ liệu và cache
-chmod -R u+rwx "$PROJECT_ROOT" 2>/dev/null || true
+# Đảm bảo toàn quyền đọc/ghi cho thư mục dữ liệu và cache (chỉ trên thư mục data)
 mkdir -p "$PROJECT_ROOT/backend/data/cache/epubs" 2>/dev/null || true
 mkdir -p "$PROJECT_ROOT/backend/data/cache/covers" 2>/dev/null || true
+chmod -R u+rwx "$PROJECT_ROOT/backend/data" 2>/dev/null || true
 
 # Lấy danh sách địa chỉ IP mạng nội bộ hiện tại
 IP_ADDRESSES=""

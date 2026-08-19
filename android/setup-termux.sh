@@ -31,10 +31,14 @@ PROJECT_ROOT="$(dirname "$DIR")"
 cd "$PROJECT_ROOT/backend"
 pip install -r "$DIR/requirements-termux.txt"
 
+# Tắt kiểm tra filemode của git để chống xung đột quyền file
+git config core.filemode false 2>/dev/null || true
+
 # 4. Tạo alias 'ztruyen' và 'ztruyen-update' để khởi động và cập nhật nhanh
 echo ""
 echo "[4/4] Đang tạo phím tắt lệnh 'ztruyen' và 'ztruyen-update'..."
 START_SCRIPT="$DIR/start-server.sh"
+UPDATE_SCRIPT="$DIR/update.sh"
 chmod +x "$DIR"/*.sh 2>/dev/null || true
 
 # Xóa alias cũ nếu có và tạo alias mới chuẩn xác
@@ -42,7 +46,7 @@ sed -i '/alias ztruyen=/d' ~/.bashrc 2>/dev/null || true
 sed -i '/alias ztruyen-update=/d' ~/.bashrc 2>/dev/null || true
 
 echo "alias ztruyen='bash $START_SCRIPT'" >> ~/.bashrc
-echo "alias ztruyen-update='cd ~/ztruyen && git fetch origin main && git reset --hard origin/main && chmod +x ~/ztruyen/android/*.sh 2>/dev/null || true && bash $START_SCRIPT'" >> ~/.bashrc
+echo "alias ztruyen-update='bash $UPDATE_SCRIPT'" >> ~/.bashrc
 
 echo ""
 echo "======================================================================"
