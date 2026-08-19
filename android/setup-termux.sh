@@ -35,15 +35,14 @@ pip install -r "$DIR/requirements-termux.txt"
 echo ""
 echo "[4/4] Đang tạo phím tắt lệnh 'ztruyen' và 'ztruyen-update'..."
 START_SCRIPT="$DIR/start-server.sh"
-chmod +x "$START_SCRIPT"
+chmod +x "$DIR"/*.sh 2>/dev/null || true
 
-if ! grep -q "alias ztruyen=" ~/.bashrc 2>/dev/null; then
-    echo "alias ztruyen='$START_SCRIPT'" >> ~/.bashrc
-fi
+# Xóa alias cũ nếu có và tạo alias mới chuẩn xác
+sed -i '/alias ztruyen=/d' ~/.bashrc 2>/dev/null || true
+sed -i '/alias ztruyen-update=/d' ~/.bashrc 2>/dev/null || true
 
-if ! grep -q "alias ztruyen-update=" ~/.bashrc 2>/dev/null; then
-    echo "alias ztruyen-update='cd ~/ztruyen && git fetch origin main && git reset --hard origin/main && $START_SCRIPT'" >> ~/.bashrc
-fi
+echo "alias ztruyen='bash $START_SCRIPT'" >> ~/.bashrc
+echo "alias ztruyen-update='cd ~/ztruyen && git fetch origin main && git reset --hard origin/main && chmod +x ~/ztruyen/android/*.sh 2>/dev/null || true && bash $START_SCRIPT'" >> ~/.bashrc
 
 echo ""
 echo "======================================================================"
