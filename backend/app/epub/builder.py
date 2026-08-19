@@ -41,9 +41,36 @@ class EpubBuilder:
         )
         book.add_item(style_item)
 
-        # 2. Add Cover Image if provided
+        spine_items: list[Any] = ["nav"]
+        toc_items: list[Any] = []
+
+        # 2. Add Cover Image & Cover Page if provided
         if cover_image_bytes:
             book.set_cover("cover.jpg", cover_image_bytes)
+            cover_html = f"""<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="vi" lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>Bìa sách</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+</head>
+<body style="margin: 0; padding: 0; text-align: center;">
+    <div class="cover-image">
+        <img src="cover.jpg" alt="Bìa sách" style="max-width: 100%; max-height: 100vh; object-fit: contain;"/>
+    </div>
+</body>
+</html>"""
+            cover_page = epub.EpubHtml(
+                title="Bìa sách",
+                file_name="cover_page.xhtml",
+                lang="vi",
+                content=cover_html.encode("utf-8"),
+            )
+            cover_page.add_item(style_item)
+            book.add_item(cover_page)
+            spine_items.append(cover_page)
+            toc_items.append(epub.Link("cover_page.xhtml", "Bìa sách", "cover_page"))
 
         # 3. Add Title Page
         title_page_html = XHTML_TITLE_PAGE_TEMPLATE.format(
@@ -60,11 +87,10 @@ class EpubBuilder:
         )
         title_page.add_item(style_item)
         book.add_item(title_page)
+        spine_items.append(title_page)
+        toc_items.append(epub.Link("title_page.xhtml", "Trang thông tin", "title_page"))
 
         # 4. Add Chapters
-        spine_items: list[Any] = ["nav", title_page]
-        toc_items: list[Any] = [epub.Link("title_page.xhtml", "Trang bìa", "title_page")]
-
         for idx, chap in enumerate(chapters, start=1):
             chap_filename = f"chapter_{chap.order_num:04d}.xhtml"
             chap_html = XHTML_CHAPTER_TEMPLATE.format(
