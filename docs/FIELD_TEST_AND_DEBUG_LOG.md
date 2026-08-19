@@ -149,6 +149,15 @@
 - **Trải nghiệm thực tế với máy đọc sách Xteink X3**:
   - Khi bạn dùng máy X3 kết nối qua Wi-Fi/Hotspot vào điện thoại: Điện thoại không mở trình duyệt nội bộ nữa, app Termux được cấp quyền **"Không giới hạn (Unrestricted)"** và chạy `termux-wake-lock`, kết hợp với kết nối socket TCP trực tiếp sẽ đạt **tốc độ tối đa liên tục**, không bị hệ điều hành Android kìm hãm xung nhịp.
 
+### 9. BUG-007: Lỗi 404 Khi Nhấn Vào Bộ Truyện (Endpoint Path Mismatch)
+- **Triệu chứng**: Khi nhấn vào tên truyện (ví dụ: `chung-cuc-truyen-ky`, `lac-hong-than-chu`, `muc-than-ky`), giao diện báo lỗi và Termux ghi log: `GET /opds/api/book/source/slug HTTP/1.1 404 Not Found`. Không xem được danh sách chương và tab gom tập.
+- **Nguyên nhân**:
+  - Trong `books.py`, endpoint JSON được đăng ký là `@router.get("/api/book/{source_id}/{book_slug}/chapters")` (kèm tiền tố `/opds` thành `/opds/api/book/.../chapters`).
+  - Trong khi đó Web UI gọi `/opds/api/book/${source}/${slug}` (thiếu đuôi `/chapters`), dẫn đến không khớp route và FastAPI trả về mã lỗi 404.
+- **Khắc phục**:
+  1. Thêm đồng thời cả 2 route alias trong `books.py`: `@router.get("/api/book/{source_id}/{book_slug}")` và `@router.get("/api/book/{source_id}/{book_slug}/chapters")`.
+  2. Nâng cấp hàm `openStoryDetail()` và `renderVolumesTab()` trong `web.py` với cơ chế tải song song `Promise.allSettled` nạp đồng thời cả danh sách chương lẻ và danh sách tập 50 chương, kèm cơ chế tự động chuyển tab dự phòng (fallback) nếu một trong hai gặp sự cố.
+
 ---
 
 ## 🚀 3. Đánh Giá Trải Nghiệm & Đề Xuất Kiến Trúc Cài Đặt 1-Click Cho Người Dùng Cuối
