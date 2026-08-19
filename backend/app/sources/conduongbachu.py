@@ -103,6 +103,9 @@ class ConDuongBaChuAdapter:
     async def get_latest(self, page: int = 1) -> list[StorySummary]:
         return await self.search("", page)
 
+    async def get_completed(self, page: int = 1) -> list[StorySummary]:
+        return await self.search("", page)
+
     async def get_genres(self) -> list[GenreItem]:
         return [
             GenreItem(

@@ -1,7 +1,7 @@
 """EPUB file download gateway endpoint for Xteink X3 and KOReader."""
 
 import re
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from app.epub.bundler import volume_bundler
 from app.logging import logger
@@ -14,6 +14,7 @@ async def download_epub(
     source_id: str,
     book_slug: str,
     artifact_name: str,
+    background_tasks: BackgroundTasks,
 ) -> FileResponse:
     """
     Download compiled EPUB volume or single chapter directly to X3 SD card.
@@ -47,6 +48,13 @@ async def download_epub(
                 source_id=source_id,
                 story_slug=book_slug,
                 chap_order=chap_order,
+            )
+            # Kích hoạt tải ngầm 3 chương tiếp theo & dọn dẹp 5 chương cũ
+            background_tasks.add_task(
+                volume_bundler.prefetch_and_cleanup,
+                source_id,
+                book_slug,
+                chap_order,
             )
             return FileResponse(
                 path=file_path,

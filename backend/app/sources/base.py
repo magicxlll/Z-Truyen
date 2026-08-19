@@ -25,6 +25,10 @@ class SourceAdapter(Protocol):
         """Retrieve newest / updated stories."""
         ...
 
+    async def get_completed(self, page: int = 1) -> list[StorySummary]:
+        """Retrieve completed / full stories."""
+        ...
+
     async def get_genres(self) -> list[GenreItem]:
         """Retrieve list of genre categories."""
         ...

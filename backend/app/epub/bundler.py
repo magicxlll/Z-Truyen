@@ -231,5 +231,45 @@ class VolumeBundler:
         saved_path = self.storage.save_epub(filename, epub_bytes)
         return saved_path, sha1_hash
 
+    async def prefetch_and_cleanup(
+        self,
+        source_id: str,
+        story_slug: str,
+        current_chap_order: int,
+        prefetch_count: int = 3,
+        cleanup_behind: int = 5,
+    ) -> None:
+        """
+        Background worker:
+        1. Prefetch next N chapters (build EPUBs in background for near-online instant reading).
+        2. Clean up single-chapter EPUBs older than 5 chapters behind to save disk space.
+        """
+        logger.info(
+            f"[PrefetchEngine] Starting background prefetch for {source_id}:{story_slug} from chapter {current_chap_order}"
+        )
+        # 1. Prefetch next chapters
+        for next_order in range(current_chap_order + 1, current_chap_order + 1 + prefetch_count):
+            try:
+                next_filename = build_chapter_filename(source_id, story_slug, next_order)
+                if not self.storage.has_epub(next_filename):
+                    logger.info(f"[PrefetchEngine] Background caching next chapter {next_order}...")
+                    await self.get_or_build_single_chapter(source_id, story_slug, next_order)
+            except Exception as e:
+                logger.debug(f"[PrefetchEngine] Reached end of chapters or prefetch stopped at {next_order}: {e}")
+                break
+
+        # 2. Smart auto-cleanup for chapters older than cleanup_behind
+        if current_chap_order > cleanup_behind:
+            clean_until = current_chap_order - cleanup_behind
+            for old_order in range(1, clean_until + 1):
+                old_filename = build_chapter_filename(source_id, story_slug, old_order)
+                old_path = self.storage.epub_dir / old_filename
+                if old_path.is_file():
+                    try:
+                        old_path.unlink()
+                        logger.info(f"[SmartCache] Auto-cleaned old cached chapter: {old_filename}")
+                    except Exception as e:
+                        logger.debug(f"[SmartCache] Failed to delete {old_filename}: {e}")
+
 
 volume_bundler = VolumeBundler()

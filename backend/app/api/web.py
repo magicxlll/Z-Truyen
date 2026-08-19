@@ -1,10 +1,8 @@
 """Web testing interface for easy browser exploration, searching and EPUB downloading."""
 
 import html
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
-from app.sources.registry import registry
-from app.config import settings
 
 router = APIRouter(tags=["Web UI"])
 
@@ -358,9 +356,9 @@ WEB_HTML = """<!DOCTYPE html>
             background-color: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 16px 16px 0 0;
-            max-width: 650px;
+            max-width: 720px;
             width: 100%;
-            max-height: 88vh;
+            max-height: 90vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -412,12 +410,124 @@ WEB_HTML = """<!DOCTYPE html>
             padding: 0.2rem 0.5rem;
         }
 
+        /* Modal Tabs */
+        .modal-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            background-color: rgba(15, 23, 42, 0.6);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 0.75rem;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background-color: rgba(56, 189, 248, 0.08);
+        }
+
         .modal-body {
             padding: 1rem;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
+        }
+
+        /* Chapter list controls */
+        .chapter-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .sort-btn {
+            background-color: var(--bg-main);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 0.45rem 0.85rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .chap-search-input {
+            background-color: var(--bg-main);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 0.45rem 0.75rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            outline: none;
+            width: 140px;
+        }
+
+        .chapter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 0.5rem;
+            max-height: 55vh;
+            overflow-y: auto;
+            padding-right: 0.25rem;
+        }
+
+        .chap-item {
+            background-color: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.6rem 0.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            gap: 0.3rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chap-item:hover {
+            border-color: var(--primary);
+            background-color: rgba(56, 189, 248, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .chap-item-title {
+            font-size: 0.78rem;
+            font-weight: 600;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.25;
+        }
+
+        .chap-item-btn {
+            font-size: 0.7rem;
+            color: var(--primary);
+            font-weight: 700;
         }
 
         .volume-item {
@@ -530,29 +640,30 @@ WEB_HTML = """<!DOCTYPE html>
     <div class="container">
         <div class="hero">
             <h1>Thư Viện Truyện Tiếng Việt Cho Xteink X3</h1>
-            <p>Duyệt, tìm kiếm và tải EPUB gom tập (50 chương/quyển) chuẩn hóa KOSync cho máy đọc sách E-ink.</p>
+            <p>Đọc Online từng chương tức thì (0.3s) &amp; Tải EPUB gom tập (50 chương) chuẩn hóa KOSync.</p>
             
             <div class="search-box">
                 <input type="text" id="search-input" placeholder="Nhập tên truyện, tác giả (ví dụ: Vũ Động Càn Khôn, Con Đường Bá Chủ)..." />
-                <select id="source-select">
+                <select id="source-select" onchange="onSourceChange()">
                     <option value="">Tất cả nguồn</option>
-                    <option value="conduongbachu">Con Đường Bá Chủ</option>
                     <option value="storyaclick">Storya.click</option>
                     <option value="akaytruyen">AkayTruyen</option>
+                    <option value="conduongbachu">Con Đường Bá Chủ</option>
                 </select>
                 <button onclick="performSearch()">Tìm Kiếm</button>
             </div>
 
             <div class="quick-nav">
-                <button class="active" onclick="loadCategory('hot', this)">🔥 Truyện Hot</button>
-                <button onclick="loadCategory('latest', this)">⚡ Mới Cập Nhật</button>
+                <button id="nav-hot" class="active" onclick="loadCategory('hot', this)">🔥 Truyện Hot</button>
+                <button id="nav-latest" onclick="loadCategory('latest', this)">⚡ Mới Cập Nhật</button>
+                <button id="nav-completed" onclick="loadCategory('completed', this)">✅ Hoàn Thành (Full)</button>
                 <button onclick="loadSearch('Con Đường Bá Chủ', 'conduongbachu', this)">⚔️ Con Đường Bá Chủ</button>
                 <button onclick="loadSearch('Tiên Hiệp', '', this)">✨ Tiên Hiệp</button>
             </div>
         </div>
 
         <div id="results-container">
-            <div class="loading">Đang tải danh sách truyện...</div>
+            <div class="loading">Đang nạp danh sách truyện...</div>
         </div>
     </div>
 
@@ -563,23 +674,47 @@ WEB_HTML = """<!DOCTYPE html>
                 <h3 id="modal-title">Chi tiết bộ truyện</h3>
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
+            
+            <!-- Tabs -->
+            <div class="modal-tabs">
+                <button class="tab-btn active" id="tab-btn-chapters" onclick="switchTab('chapters')">
+                    ⚡ Đọc Từng Chương (Online 0.3s)
+                </button>
+                <button class="tab-btn" id="tab-btn-volumes" onclick="switchTab('volumes')">
+                    📦 Gom Tập (50 Chương/Tập)
+                </button>
+            </div>
+
             <div class="modal-body" id="modal-content">
-                <div class="loading">Đang nạp danh sách tập EPUB...</div>
+                <div class="loading">Đang nạp danh sách chương...</div>
             </div>
         </div>
     </div>
 
     <footer>
-        <p>Z-Truyen X3 — Powered by FastAPI &amp; Dynamic Volume Bundling. Tương thích 100% OPDS Browser CrossVi 1.1.2 &amp; KOReader.</p>
+        <p>Z-Truyen X3 — Tương thích 100% OPDS Browser CrossVi 1.1.2 &amp; KOReader. Tự động tải ngầm 3 chương tiếp theo &amp; dọn dẹp bộ nhớ thông minh.</p>
     </footer>
 
     <script>
-        // Set dynamic OPDS URL based on current host
         document.getElementById('opds-url').innerText = window.location.origin + '/opds';
 
         document.getElementById('search-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') performSearch();
         });
+
+        let currentCategory = 'hot';
+        let currentStoryData = null;
+        let currentTab = 'chapters';
+        let currentSort = 'asc'; // 'asc' = 1 -> N, 'desc' = N -> 1
+        let cachedStoryVolumes = null;
+
+        function onSourceChange() {
+            if (document.getElementById('search-input').value.trim()) {
+                performSearch();
+            } else {
+                loadCategory(currentCategory, null);
+            }
+        }
 
         async function fetchStories(endpoint) {
             const container = document.getElementById('results-container');
@@ -589,7 +724,7 @@ WEB_HTML = """<!DOCTYPE html>
                 const text = await res.text();
                 parseAtomFeed(text);
             } catch (err) {
-                container.innerHTML = '<div class="loading" style="color: #ef4444;">Lỗi kết nối máy chủ: ' + err.message + '</div>';
+                container.innerHTML = '<div class="loading" style="color: #ef4444;">Lỗi kết nối: ' + err.message + '</div>';
             }
         }
 
@@ -610,7 +745,6 @@ WEB_HTML = """<!DOCTYPE html>
                 const id = entry.querySelector('id')?.textContent || '';
                 const author = entry.querySelector('author name')?.textContent || 'Đang cập nhật';
                 
-                // Get cover link
                 let coverLink = 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300';
                 const linkElements = Array.from(entry.getElementsByTagName('link'));
                 const imgLinkEl = linkElements.find(l => (l.getAttribute('rel') || '').includes('image'));
@@ -621,7 +755,6 @@ WEB_HTML = """<!DOCTYPE html>
                 const subLinkEl = linkElements.find(l => l.getAttribute('rel') === 'subsection');
                 const subLink = subLinkEl ? subLinkEl.getAttribute('href') : '';
                 
-                // Extract source and slug
                 let source = 'Nguồn', slug = '';
                 if (id.includes('urn:ztruyen:story:')) {
                     const parts = id.replace('urn:ztruyen:story:', '').split(':');
@@ -644,7 +777,7 @@ WEB_HTML = """<!DOCTYPE html>
                         <div class="card-body">
                             <div class="card-title">${escapeHtml(title)}</div>
                             <div class="card-author">${escapeHtml(author)}</div>
-                            <div class="card-btn">Xem &amp; Tải EPUB &rarr;</div>
+                            <div class="card-btn">Đọc &amp; Tải EPUB &rarr;</div>
                         </div>
                     </div>
                 `;
@@ -666,16 +799,25 @@ WEB_HTML = """<!DOCTYPE html>
         }
 
         function loadCategory(cat, btn) {
+            currentCategory = cat;
             document.querySelectorAll('.quick-nav button').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
-            fetchStories('/opds/' + cat);
+            else {
+                const el = document.getElementById('nav-' + cat);
+                if (el) el.classList.add('active');
+            }
+
+            const source = document.getElementById('source-select').value;
+            let url = '/opds/' + cat;
+            if (source) url += '?source=' + encodeURIComponent(source);
+            fetchStories(url);
         }
 
         function loadSearch(q, src, btn) {
             document.querySelectorAll('.quick-nav button').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
             document.getElementById('search-input').value = q;
-            document.getElementById('source-select').value = src;
+            if (src) document.getElementById('source-select').value = src;
             performSearch();
         }
 
@@ -685,69 +827,173 @@ WEB_HTML = """<!DOCTYPE html>
             const modalContent = document.getElementById('modal-content');
             
             modalTitle.innerText = title;
-            modalContent.innerHTML = '<div class="loading">Đang nạp danh sách tập EPUB...</div>';
+            modalContent.innerHTML = '<div class="loading">Đang tải danh sách chương từ ' + source + '...</div>';
             modal.style.display = 'flex';
+            currentTab = 'chapters';
+            currentSort = 'asc';
+            document.getElementById('tab-btn-chapters').classList.add('active');
+            document.getElementById('tab-btn-volumes').classList.remove('active');
 
             try {
-                const res = await fetch('/opds/book/' + source + '/' + slug);
+                // Fetch JSON chapter list
+                const res = await fetch('/opds/api/book/' + source + '/' + slug);
                 if (!res.ok) throw new Error('HTTP ' + res.status);
-                const text = await res.text();
-                const parser = new DOMParser();
-                const xml = parser.parseFromString(text, 'text/xml');
-                const entries = xml.querySelectorAll('entry');
-
-                let bodyHtml = '<div style="display: flex; flex-direction: column; gap: 0.65rem;">';
-                if (!entries || entries.length === 0) {
-                    bodyHtml += '<p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">Không tìm thấy tập nào.</p>';
-                } else {
-                    entries.forEach((entry, idx) => {
-                        const entryTitle = entry.querySelector('title')?.textContent || ('Tập ' + (idx + 1));
-                        const summary = entry.querySelector('summary')?.textContent || 'Gom 50 chương';
-                        
-                        // Extract acquisition download link
-                        let dlLink = '';
-                        const linkTags = Array.from(entry.getElementsByTagName('link'));
-                        const acqTag = linkTags.find(l => (l.getAttribute('rel') || '').includes('acquisition'));
-                        if (acqTag) {
-                            dlLink = acqTag.getAttribute('href');
-                        } else {
-                            // Fallback direct URL format
-                            const filename = `ztruyen_${source}_${slug}_v${String(idx+1).padStart(2, '0')}.epub`;
-                            dlLink = `/opds/download/${source}/${slug}/${filename}`;
-                        }
-
-                        const filename = dlLink.split('/').pop() || `${slug}_v${idx+1}.epub`;
-
-                        bodyHtml += `
-                            <div class="volume-item">
-                                <div class="volume-info">
-                                    <h4>${escapeHtml(entryTitle)}</h4>
-                                    <p>${escapeHtml(summary)}</p>
-                                </div>
-                                <button type="button" class="dl-btn" onclick="startDownload('${dlLink}', '${filename}', this)">
-                                    <span>📥 Tải EPUB</span>
-                                </button>
-                            </div>
-                        `;
-                    });
-                }
-                bodyHtml += '</div>';
-                modalContent.innerHTML = bodyHtml;
+                currentStoryData = await res.json();
+                currentStoryData.source_id = source;
+                currentStoryData.slug = slug;
+                renderChaptersTab();
+                
+                // Prefetch volume feed in background for Tab 2
+                fetchVolumeFeed(source, slug);
             } catch (err) {
-                modalContent.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 2rem 0;">Lỗi tải thông tin tập: ' + err.message + '</p>';
+                modalContent.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 2rem 0;">Lỗi tải dữ liệu: ' + err.message + '</p>';
             }
         }
 
-        async function startDownload(url, filename, btn) {
-            if (!url || url === '#') {
-                alert('Không tìm thấy link tải EPUB cho tập này.');
+        async function fetchVolumeFeed(source, slug) {
+            try {
+                const res = await fetch('/opds/book/' + source + '/' + slug);
+                if (res.ok) {
+                    const text = await res.text();
+                    cachedStoryVolumes = text;
+                }
+            } catch (_) {}
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            if (tab === 'chapters') {
+                document.getElementById('tab-btn-chapters').classList.add('active');
+                document.getElementById('tab-btn-volumes').classList.remove('active');
+                renderChaptersTab();
+            } else {
+                document.getElementById('tab-btn-chapters').classList.remove('active');
+                document.getElementById('tab-btn-volumes').classList.add('active');
+                renderVolumesTab();
+            }
+        }
+
+        function toggleSort() {
+            currentSort = (currentSort === 'asc') ? 'desc' : 'asc';
+            renderChaptersTab();
+        }
+
+        function filterChapters() {
+            const filterVal = document.getElementById('chap-search').value.trim().toLowerCase();
+            const items = document.querySelectorAll('.chap-item');
+            items.forEach(el => {
+                const text = el.getAttribute('data-search') || '';
+                if (!filterVal || text.includes(filterVal)) {
+                    el.style.display = 'flex';
+                } else {
+                    el.style.display = 'none';
+                }
+            });
+        }
+
+        function renderChaptersTab() {
+            if (!currentStoryData || !currentStoryData.chapters) return;
+            const modalContent = document.getElementById('modal-content');
+            
+            let chapters = [...currentStoryData.chapters];
+            if (currentSort === 'desc') {
+                chapters.reverse();
+            }
+
+            let html = `
+                <div class="chapter-controls">
+                    <button type="button" class="sort-btn" onclick="toggleSort()">
+                        ${currentSort === 'asc' ? '⬆️ Chương 1 ➔ ' + chapters.length : '⬇️ Chương ' + chapters.length + ' ➔ 1'}
+                    </button>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">
+                        Tổng <strong>${currentStoryData.story.total_chapters}</strong> chương
+                    </div>
+                    <input type="text" id="chap-search" class="chap-search-input" placeholder="🔍 Đến chương..." oninput="filterChapters()" />
+                </div>
+                <div style="font-size: 0.75rem; color: var(--primary); padding: 0.2rem 0;">
+                    💡 Nhấn chương để đọc tức thì &amp; tự động tải ngầm 3 chương kế tiếp.
+                </div>
+                <div class="chapter-grid">
+            `;
+
+            chapters.forEach(c => {
+                const searchKey = `${c.order} chuong ${c.order} ${c.title.toLowerCase()}`;
+                html += `
+                    <div class="chap-item" data-search="${escapeHtml(searchKey)}" onclick="startDownload('${c.download_url}', '${c.filename}', this)">
+                        <div class="chap-item-title">${escapeHtml(c.title)}</div>
+                        <div class="chap-item-btn">⚡ Đọc ngay</div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            modalContent.innerHTML = html;
+        }
+
+        function renderVolumesTab() {
+            const modalContent = document.getElementById('modal-content');
+            if (!cachedStoryVolumes) {
+                modalContent.innerHTML = '<div class="loading">Đang tải danh sách tập 50 chương...</div>';
                 return;
             }
 
-            const originalContent = btn.innerHTML;
-            btn.innerHTML = '<span>⏳ Đang cào &amp; nén...</span>';
-            btn.classList.add('downloading');
-            btn.disabled = true;
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(cachedStoryVolumes, 'text/xml');
+            const entries = xml.querySelectorAll('entry');
+
+            let bodyHtml = '<div style="display: flex; flex-direction: column; gap: 0.65rem;">';
+            if (!entries || entries.length === 0) {
+                bodyHtml += '<p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">Không tìm thấy tập nào.</p>';
+            } else {
+                entries.forEach((entry, idx) => {
+                    const entryTitle = entry.querySelector('title')?.textContent || ('Tập ' + (idx + 1));
+                    const summary = entry.querySelector('summary')?.textContent || 'Gom 50 chương';
+                    
+                    let dlLink = '';
+                    const linkTags = Array.from(entry.getElementsByTagName('link'));
+                    const acqTag = linkTags.find(l => (l.getAttribute('rel') || '').includes('acquisition'));
+                    if (acqTag) {
+                        dlLink = acqTag.getAttribute('href');
+                    } else {
+                        const filename = `ztruyen_${currentStoryData.source_id}_${currentStoryData.slug}_v${String(idx+1).padStart(2, '0')}.epub`;
+                        dlLink = `/opds/download/${currentStoryData.source_id}/${currentStoryData.slug}/${filename}`;
+                    }
+
+                    const filename = dlLink.split('/').pop() || `vol_${idx+1}.epub`;
+
+                    bodyHtml += `
+                        <div class="volume-item">
+                            <div class="volume-info">
+                                <h4>${escapeHtml(entryTitle)}</h4>
+                                <p>${escapeHtml(summary)}</p>
+                            </div>
+                            <button type="button" class="dl-btn" onclick="startDownload('${dlLink}', '${filename}', this)">
+                                <span>📥 Tải EPUB Tập</span>
+                            </button>
+                        </div>
+                    `;
+                });
+            }
+            bodyHtml += '</div>';
+            modalContent.innerHTML = bodyHtml;
+        }
+
+        async function startDownload(url, filename, el) {
+            if (!url || url === '#') {
+                alert('Không tìm thấy link tải EPUB cho mục này.');
+                return;
+            }
+
+            const isChapItem = el.classList.contains('chap-item');
+            const originalContent = el.innerHTML;
+            
+            if (isChapItem) {
+                el.innerHTML = '<div class="chap-item-title">⏳ Đang tải...</div><div class="chap-item-btn">Vui lòng đợi</div>';
+            } else {
+                el.innerHTML = '<span>⏳ Đang cào &amp; nén...</span>';
+                el.classList.add('downloading');
+            }
+            el.style.pointerEvents = 'none';
 
             try {
                 const resp = await fetch(url);
@@ -774,21 +1020,33 @@ WEB_HTML = """<!DOCTYPE html>
                     a.remove();
                 }, 1000);
 
-                btn.classList.remove('downloading');
-                btn.classList.add('success');
-                btn.innerHTML = '<span>✅ Đã tải về!</span>';
+                if (isChapItem) {
+                    el.innerHTML = '<div class="chap-item-title" style="color: var(--success);">✅ Đã mở</div><div class="chap-item-btn">Xong</div>';
+                } else {
+                    el.classList.remove('downloading');
+                    el.classList.add('success');
+                    el.innerHTML = '<span>✅ Đã tải về!</span>';
+                }
 
                 setTimeout(() => {
-                    btn.classList.remove('success');
-                    btn.innerHTML = originalContent;
-                    btn.disabled = false;
-                }, 3000);
+                    if (isChapItem) {
+                        el.innerHTML = originalContent;
+                    } else {
+                        el.classList.remove('success');
+                        el.innerHTML = originalContent;
+                    }
+                    el.style.pointerEvents = 'auto';
+                }, 2500);
 
             } catch (err) {
-                alert('⚠️ Lỗi khi tải tập EPUB:\\n' + err.message);
-                btn.classList.remove('downloading');
-                btn.innerHTML = '<span>❌ Thử lại</span>';
-                btn.disabled = false;
+                alert('⚠️ Lỗi khi tải EPUB:\\n' + err.message);
+                if (isChapItem) {
+                    el.innerHTML = originalContent;
+                } else {
+                    el.classList.remove('downloading');
+                    el.innerHTML = '<span>❌ Thử lại</span>';
+                }
+                el.style.pointerEvents = 'auto';
             }
         }
 

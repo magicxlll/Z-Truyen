@@ -23,12 +23,18 @@ async def get_opds_root(request: Request) -> Response:
 
 @router.get("/hot", response_class=Response)
 @router.get("/catalog/hot", response_class=Response)
-async def get_opds_hot(request: Request, page: int = 1) -> Response:
-    """Return trending and popular stories across active sources."""
+async def get_opds_hot(request: Request, page: int = 1, source: str | None = None) -> Response:
+    """Return trending and popular stories across active sources (or single source)."""
     base_url = str(request.base_url).rstrip("/")
-    self_url = f"{base_url}/opds/hot?page={page}"
+    self_url = f"{base_url}/opds/hot?page={page}" + (f"&source={source}" if source else "")
 
-    tasks = [a.get_hot(page) for a in registry.list_adapters()]
+    if source:
+        adapter = registry.get(source)
+        adapters = [adapter] if adapter else []
+    else:
+        adapters = registry.list_adapters()
+
+    tasks = [a.get_hot(page) for a in adapters]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     combined_stories: list[StorySummary] = []
@@ -51,12 +57,18 @@ async def get_opds_hot(request: Request, page: int = 1) -> Response:
 @router.get("/latest", response_class=Response)
 @router.get("/catalog/new", response_class=Response)
 @router.get("/catalog/latest", response_class=Response)
-async def get_opds_latest(request: Request, page: int = 1) -> Response:
+async def get_opds_latest(request: Request, page: int = 1, source: str | None = None) -> Response:
     """Return newest updated stories."""
     base_url = str(request.base_url).rstrip("/")
-    self_url = f"{base_url}/opds/latest?page={page}"
+    self_url = f"{base_url}/opds/latest?page={page}" + (f"&source={source}" if source else "")
 
-    tasks = [a.get_latest(page) for a in registry.list_adapters()]
+    if source:
+        adapter = registry.get(source)
+        adapters = [adapter] if adapter else []
+    else:
+        adapters = registry.list_adapters()
+
+    tasks = [a.get_latest(page) for a in adapters]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     combined_stories: list[StorySummary] = []
@@ -69,6 +81,39 @@ async def get_opds_latest(request: Request, page: int = 1) -> Response:
     xml = OpdsBuilder.build_story_list_feed(
         feed_id="urn:ztruyen:category:latest",
         title="⚡ Truyện Mới Cập Nhật",
+        stories=combined_stories,
+        self_url=self_url,
+        base_url=base_url,
+    )
+    return Response(content=xml, media_type=ATOM_XML_MEDIA_TYPE)
+
+
+@router.get("/completed", response_class=Response)
+@router.get("/catalog/completed", response_class=Response)
+async def get_opds_completed(request: Request, page: int = 1, source: str | None = None) -> Response:
+    """Return completed / full stories."""
+    base_url = str(request.base_url).rstrip("/")
+    self_url = f"{base_url}/opds/completed?page={page}" + (f"&source={source}" if source else "")
+
+    if source:
+        adapter = registry.get(source)
+        adapters = [adapter] if adapter else []
+    else:
+        adapters = registry.list_adapters()
+
+    tasks = [a.get_completed(page) for a in adapters]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    combined_stories: list[StorySummary] = []
+    for res in results:
+        if isinstance(res, list):
+            combined_stories.extend(res)
+        elif isinstance(res, Exception):
+            logger.warning(f"Failed to fetch completed stories: {res}")
+
+    xml = OpdsBuilder.build_story_list_feed(
+        feed_id="urn:ztruyen:category:completed",
+        title="✅ Truyện Hoàn Thành (Full)",
         stories=combined_stories,
         self_url=self_url,
         base_url=base_url,

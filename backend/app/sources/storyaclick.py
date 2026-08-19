@@ -89,6 +89,22 @@ class StoryaClickAdapter:
             )
         return results
 
+    async def get_completed(self, page: int = 1) -> list[StorySummary]:
+        data = await self._api_get(f"/stories?status=COMPLETED&page={page}&limit=20")
+        items = data.get("data", [])
+        results: list[StorySummary] = []
+        for item in items:
+            results.append(
+                StorySummary(
+                    source_id=self.id,
+                    slug=item.get("slug") or "",
+                    title=item.get("title") or "Chưa có tiêu đề",
+                    author=item.get("author", {}).get("name", "Đang cập nhật") if isinstance(item.get("author"), dict) else "Đang cập nhật",
+                    cover_url=self._fix_cover_url(item.get("coverUrl")),
+                )
+            )
+        return results
+
     async def get_genres(self) -> list[GenreItem]:
         data = await self._api_get("/genres")
         items = data.get("data", [])

@@ -107,6 +107,15 @@ class AkayTruyenAdapter:
             return self._parse_story_anchors(new_section.html or "")
         return self._parse_story_anchors(resp.text)[:20]
 
+    async def get_completed(self, page: int = 1) -> list[StorySummary]:
+        cookies = self.session_manager.get_cookies(self.id)
+        url = f"{self.base_url}/danh-sach/truyen-full?page={page}"
+        resp = await self.client.get(url, headers=self._get_headers(), cookies=cookies)
+        results = self._parse_story_anchors(resp.text)
+        if not results:
+            return await self.get_latest(page)
+        return results[:20]
+
     async def get_genres(self) -> list[GenreItem]:
         cookies = self.session_manager.get_cookies(self.id)
         resp = await self.client.get(f"{self.base_url}/", headers=self._get_headers(), cookies=cookies)

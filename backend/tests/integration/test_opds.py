@@ -34,6 +34,9 @@ class MockStoryaAdapter:
     async def get_latest(self, page: int = 1) -> list[StorySummary]:
         return await self.search("", page)
 
+    async def get_completed(self, page: int = 1) -> list[StorySummary]:
+        return await self.search("", page)
+
     async def get_genres(self) -> list:
         return []
 
@@ -161,3 +164,47 @@ async def test_opds_download_epub_gateway() -> None:
         cached_response = await client.get(url)
         assert cached_response.status_code == 200
         assert cached_response.headers["X-KOSync-SHA1"] == response.headers["X-KOSync-SHA1"]
+
+
+@pytest.mark.asyncio
+async def test_opds_completed_and_source_filter() -> None:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/opds/completed?source=storyaclick")
+        assert resp.status_code == 200
+        assert "urn:ztruyen:category:completed" in resp.text
+        assert "Phàm Nhân Tu Tiên" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_opds_book_chapters_and_sort() -> None:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. OPDS XML format
+        resp_asc = await client.get("/opds/book/storyaclick/pham-nhan-tu-tien/chapters?sort=asc")
+        assert resp_asc.status_code == 200
+        assert "Chương 1" in resp_asc.text
+        assert "ztruyen_storyaclick_pham-nhan-tu-tien_c0001.epub" in resp_asc.text
+
+        resp_desc = await client.get("/opds/book/storyaclick/pham-nhan-tu-tien/chapters?sort=desc")
+        assert resp_desc.status_code == 200
+        assert "Chương 60" in resp_desc.text
+
+        # 2. JSON format for Web UI
+        json_resp = await client.get("/opds/api/book/storyaclick/pham-nhan-tu-tien/chapters?sort=asc")
+        assert json_resp.status_code == 200
+        data = json_resp.json()
+        assert data["story"]["title"] == "Phàm Nhân Tu Tiên"
+        assert len(data["chapters"]) == 60
+        assert data["chapters"][0]["order"] == 1
+
+
+@pytest.mark.asyncio
+async def test_opds_single_chapter_download() -> None:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        url = "/opds/download/storyaclick/pham-nhan-tu-tien/ztruyen_storyaclick_pham-nhan-tu-tien_c0001.epub"
+        response = await client.get(url)
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/epub+zip"
+        assert len(response.content) > 0
