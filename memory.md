@@ -1,40 +1,58 @@
 # Z-Truyen X3 — Project Memory & Agent Handoff Guide
 
 **Dự án**: Z-Truyen X3 (Vietnamese Story Backend & OPDS Integration for Xteink X3 & Android Pocket Host)  
-**Nhánh tính năng**: `001-z-truyen-x3`  
+**Nhánh tính năng**: `001-z-truyen-x3` (Đồng bộ chính thức trên nhánh `main`)  
+**GitHub Repository**: [https://github.com/magicxlll/Z-Truyen.git](https://github.com/magicxlll/Z-Truyen.git)  
 **Ngày cập nhật**: 2026-08-19  
-**Trạng thái hiện tại**:
-1. **Backend Engine**: Hoàn thành 100% toàn bộ 38/38 tasks theo `specs/001-z-truyen-x3/tasks.md`. Toàn bộ 24/24 unit tests & integration tests đều đạt 100% PASS.
-2. **Máy ảo Xteink X3 (Desktop Simulator)**: Đã thiết lập hoàn chỉnh trên WSL2 Ubuntu + C++ SDL2, có sẵn launcher 1-click `run_crosspoint_x3.bat` để test trực tiếp trên Windows.
-3. **Pocket Host Server trên Android**: Đã tích hợp mDNS Zeroconf (`ztruyen.local:8080`), tạo bộ script tự động hóa cho Android Termux (`android/setup-termux.sh`, `android/start-server.sh`) và gói nén `ztruyen-android.zip`.
-4. **Giai đoạn hiện tại của Người dùng**: Người dùng đang cài đặt lên điện thoại Android thực tế và chuẩn bị test kết nối với Xteink X3. **Phiên tiếp theo sẽ tập trung vào test lỗi, xử lý ngoại lệ và debug phát sinh từ môi trường Android/X3 thực tế.**
 
 ---
 
-## 📚 1. BẢN ĐỒ TÀI LIỆU QUAN TRỌNG (NEXT AGENT MUST READ FIRST)
+## 🚀 1. TRẠNG THÁI HIỆN TẠI (CURRENT PROJECT STATE)
 
-> ⚠️ **LƯU Ý DÀNH CHO AGENT PHIÊN SAU**: 
-> Không cần đọc lại toàn bộ code từ đầu! Hãy đọc nhanh 4 file tài liệu dưới đây theo thứ tự để nắm trọn 100% ngữ cảnh dự án trong 30 giây:
+1. **Kiểm thử toàn diện**: **28/28 test cases PASS 100%** (`python -m pytest tests -v`).
+2. **Pocket Host Server trên Android (Termux)**:
+   - Đã cài đặt và vận hành ổn định trên điện thoại Android thực tế (`aarch64`, Python 3.14).
+   - Tích hợp lệnh khởi chạy `ztruyen` và lệnh tự động cập nhật code không xung đột `ztruyen-update` (`android/update.sh`).
+   - Đã xử lý triệt để hiện tượng Android Doze Mode / Background Freezing thông qua cơ chế `Acquire wakelock` và `Battery Unrestricted`.
+3. **Cơ chế Đọc "Gần Như Online" (Near-Online Streaming Engine)**:
+   - **Tải tức thì 0.3s/chương**: Tạo file EPUB 1 chương siêu nhẹ (15 - 30KB).
+   - **Tải ngầm 3 chương tiếp theo (Background Prefetch)**: Tự động cào và nén sẵn chương $N+1, N+2, N+3$ vào cache ngầm khi người dùng đọc chương $N$.
+   - **Dọn dẹp bộ nhớ thông minh (Smart Cache)**: Tự động xóa các chương cũ hơn 5 chương phía trước ($< N - 5$) để không đầy bộ nhớ điện thoại.
+   - **Đa dạng hình thức tải**: Tải 1 chương lẻ (`32`), tải gom khoảng chương tùy chọn (`1-32`), tải trọn bộ (`ALL`), và tải tập gom sẵn 50 chương/tập.
+4. **Bộ lọc & Phân loại đa nguồn**:
+   - Chọn nguồn: `Tất cả nguồn`, `Storya.click`, `AkayTruyen`, `Con Đường Bá Chủ`.
+   - Bộ lọc danh mục: `🔥 Truyện Hot`, `⚡ Mới Cập Nhật`, `✅ Hoàn Thành (Full Trọn Bộ)`.
+   - Sắp xếp chương: `⬆️ Từ đầu (1 ➔ N)` $\leftrightarrow$ `⬇️ Mới nhất (N ➔ 1)`.
+5. **Máy ảo Xteink X3 Simulator 1-Click trên Windows Desktop**:
+   - Khởi chạy 1-click qua `run_x3_simulator.bat` (Python native UTF-8).
+   - Kết nối trực tiếp qua IP Wi-Fi/Hotspot của điện thoại (hoặc localhost).
+   - Tự động lưu file EPUB tải về vào thư mục `downloads/`.
+   - Tích hợp trình đọc E-ink Terminal Reader trực tiếp (lật trang bằng Enter / N / P).
+
+---
+
+## 📚 2. BẢN ĐỒ TÀI LIỆU QUAN TRỌNG (NEXT AGENT MUST READ FIRST)
 
 | STT | Tài liệu trọng tâm | Đường dẫn file | Nội dung & Mục đích tham chiếu |
 |:---:|---|---|---|
-| 1 | **Hướng dẫn Android Host Server** | [`docs/ANDROID_SMARTPHONE_HOST_GUIDE.md`](file:///D:/03_APP/3.%20System/DATA/Antigravity/Z-Truyen/docs/ANDROID_SMARTPHONE_HOST_GUIDE.md) | **ĐỌC ĐẦU TIÊN**: Cấu hình Android Termux, phím tắt `ztruyen`, mDNS `ztruyen.local`, Hotspot IP `192.168.43.1`, cách sửa lỗi khi người dùng báo lỗi trên điện thoại. |
-| 2 | **Hướng dẫn Máy ảo X3 Desktop** | [`docs/CROSSPOINT_X3_VIRTUAL_DEVICE_GUIDE.md`](file:///D:/03_APP/3.%20System/DATA/Antigravity/Z-Truyen/docs/CROSSPOINT_X3_VIRTUAL_DEVICE_GUIDE.md) | Cách vận hành CrossPoint Simulator trên Windows, phím điều khiển, cách test kết nối OPDS từ máy ảo vào điện thoại Android. |
-| 3 | **Hướng dẫn Kiểm thử 4 Phương pháp** | [`docs/TESTING_VIRTUAL_ENV_GUIDE.md`](file:///D:/03_APP/3.%20System/DATA/Antigravity/Z-Truyen/docs/TESTING_VIRTUAL_ENV_GUIDE.md) | 4 công cụ test: Terminal CLI Simulator (`scripts/opds_simulator.py`), Web UI (`http://localhost:8080/`), Desktop X3 Simulator, và E-reader thật. |
-| 4 | **Đặc tả Kỹ thuật & Yêu cầu** | [`specs/001-z-truyen-x3/spec.md`](file:///D:/03_APP/3.%20System/DATA/Antigravity/Z-Truyen/specs/001-z-truyen-x3/spec.md) | Kiến trúc OPDS 1.2, 3 Nguồn truyện (`storyaclick`, `akaytruyen`, `conduongbachu`), quy tắc gom tập 50 chương/EPUB, KOSync SHA-1. |
+| 1 | **Nhật ký Debug & Bài học kinh nghiệm** | [`docs/FIELD_TEST_AND_DEBUG_LOG.md`](file:///D:/03_APP/3.%20System/DATA/Antigravity/Z-Truyen/docs/FIELD_TEST_AND_DEBUG_LOG.md) | **ĐỌC ĐẦU TIÊN**: Tổng hợp 8 lỗi thực tế (BUG-001 đến BUG-008), phân tích hiệu năng nền Android, giải pháp khắc phục triệt để. |
+| 2 | **Hướng dẫn Android Host Server** | [`docs/ANDROID_SMARTPHONE_HOST_GUIDE.md`](file:///D:/03_APP/3.%20System/DATA/Antigravity/Z-Truyen/docs/ANDROID_SMARTPHONE_HOST_GUIDE.md) | Hướng dẫn cài đặt Termux, phím tắt `ztruyen`, `ztruyen-update`, cấu hình WakeLock, Hotspot IP `192.168.43.1`. |
+| 3 | **Hướng dẫn Máy ảo X3 Simulator** | [`docs/CROSSPOINT_X3_VIRTUAL_DEVICE_GUIDE.md`](file:///D:/03_APP/3.%20System/DATA/Antigravity/Z-Truyen/docs/CROSSPOINT_X3_VIRTUAL_DEVICE_GUIDE.md) | Hướng dẫn chạy máy ảo X3 trên Windows, kết nối IP và đọc truyện. |
+| 4 | **Đặc tả Kỹ thuật & Yêu cầu** | [`specs/001-z-truyen-x3/spec.md`](file:///D:/03_APP/3.%20System/DATA/Antigravity/Z-Truyen/specs/001-z-truyen-x3/spec.md) | Chuẩn OPDS 1.2, 3 Nguồn truyện (`storyaclick`, `akaytruyen`, `conduongbachu`), KOSync SHA-1. |
 
 ---
 
-## 🏛️ 2. Tóm Tắt Kiến Trúc Kỹ Thuật Đã Hoàn Thiện
+## 🏛️ 3. Tóm Tắt Kiến Trúc Kỹ Thuật Đã Triển Khai
 
 ```text
                ┌─────────────────────────────────────────────────────────┐
-               │              SMARTPHONE ANDROID (HOST SERVER)           │
+               │              SMARTPHONE ANDROID (POCKET HOST)           │
                │                                                         │
-               │  - App Termux: Chạy Z-Truyen Backend (FastAPI + SQLite) │
-               │  - Module mDNS Zeroconf: Broadcast ztruyen.local:8080   │
+               │  - App Termux: FastAPI + SQLite + Background Tasks      │
+               │  - Single-Chapter Streaming + Auto Prefetch Next 3 Ch   │
+               │  - Smart Cache Cleanup (giữ bộ nhớ máy luôn gọn nhẹ)    │
+               │  - WakeLock Held: Chạy ngầm liên tục khi tắt màn hình   │
                │  - Lắng nghe: 0.0.0.0:8080                              │
-               │  - Hotspot IP: 192.168.43.1 / Wi-Fi IP: 192.168.1.xxx   │
                └────────────────────────────┬────────────────────────────┘
                                             │
                                   HTTP OPDS │ (Port 8080)
@@ -42,49 +60,25 @@
                ┌─────────────────────────────────────────────────────────┐
                │        XTEINK X3 (MÁY THẬT HOẶC MÁY ẢO WINDOWS)         │
                │                                                         │
-               │  - Firmware: CrossVi 1.1.2 / CrossPoint Reader          │
-               │  - OPDS Browser URL: http://ztruyen.local:8080/opds     │
-               │       (hoặc: http://192.168.43.1:8080/opds)             │
-               │  - Tải EPUB tiếng Việt sạch, chuẩn hóa KOSync           │
+               │  - Máy thật: OPDS Browser CrossVi 1.1.2 / KOReader      │
+               │  - Máy ảo PC: run_x3_simulator.bat                      │
+               │  - Duyệt Hot/New/Full, lọc theo Nguồn                   │
+               │  - Tải từng chương lẻ (0.3s) / Gom 1-32 / Gom Trọn Bộ   │
+               │  - Tải Tập 50 chương chuẩn hóa KOSync SHA-1             │
                └─────────────────────────────────────────────────────────┘
 ```
 
-### Các Thành Phần Mã Nguồn Cốt Lõi:
-- **Backend API & OPDS Engine** (`backend/app/api/`):
-  - `opds.py`: Cung cấp Root feed, `/hot`, `/latest`, `/genres`, `/sources` và các alias `/catalog/hot`, `/catalog/new`.
-  - `books.py`: Cung cấp danh sách tập (Volume Bundles 50 chương/tập) và hỗ trợ cả URL URN `source:slug`.
-  - `chapters.py`: Gateway tải file EPUB on-the-fly (`/opds/download/{source_id}/{slug}/{filename}`).
-  - `search.py`: Tìm kiếm truyện đa nguồn với URL-encoded queries.
-  - `web.py`: Web Test Catalog trực quan tại `http://localhost:8080/`.
-- **Hybrid Scraper Engine** (`backend/app/sources/`):
-  - `storyaclick.py`: REST JSON API scraper.
-  - `akaytruyen.py`: HTML scraper + VIP chapter session.
-  - `conduongbachu.py`: WordPress REST API (4 categories: Chính truyện & 3 Ngoại truyện).
-  - `backend/app/fetcher/client.py`: Async httpx client + Playwright Stealth fallback khi gặp Cloudflare Turnstile.
-- **EPUB Builder & Bundler** (`backend/app/epub/`):
-  - `builder.py`: Sinh XHTML sạch `<p id="p-N">`, tạo file EPUB tất định tương thích KOSync SHA-1.
-  - `bundler.py`: Dynamic Volume Bundling (50 chương/EPUB), cơ chế chống race condition với build locks.
-- **Service Discovery** (`backend/app/network/`):
-  - `mdns.py`: Tự động phát mDNS broadcast `ztruyen.local:8080` trên cả Wi-Fi và Hotspot.
-- **Android Automation** (`android/`):
-  - `setup-termux.sh`: 1-line setup cho Termux Android.
-  - `start-server.sh`: Runner script với `termux-wake-lock`, tự hiển thị IP và dọn dẹp pin khi tắt (`Ctrl + C`).
-  - `ztruyen-android.zip`: Gói nén cài đặt sẵn ở thư mục gốc.
-- **Desktop X3 Simulator** (`run_crosspoint_x3.bat`):
-  - Khởi chạy cửa sổ E-ink Xteink X3 (792 × 528) qua WSL2 Ubuntu.
-
 ---
 
-## 🎯 3. Nhiệm Vụ Trọng Tâm Cho Phiên Tiếp Theo (Next Session Focus)
+## 🎯 4. Nhiệm Vụ Trọng Tâm Cho Phiên Tiếp Theo (Next Session Focus)
 
-Khi người dùng quay lại trong phiên tiếp theo, Agent thực hiện các nội dung sau:
-
-1. **Tiếp nhận phản hồi và lỗi test từ người dùng**:
-   - Nếu lỗi liên quan đến **cài đặt Termux trên Android**: Kiểm tra `requirements-termux.txt`, cấp quyền bộ nhớ `termux-setup-storage` hoặc thư viện biên dịch `clang/make`.
-   - Nếu lỗi liên quan đến **kết nối mạng X3 -> Android**: Hướng dẫn dùng IP Hotspot cố định `http://192.168.43.1:8080/opds` hoặc kiểm tra port 8080.
-   - Nếu lỗi liên quan đến **cào truyện cụ thể từ 3 nguồn**: Kiểm tra log Termux, tối ưu hóa parser hoặc cập nhật selector của nguồn đó.
-2. **Kiểm tra tính toàn vẹn của mã nguồn**:
-   - Luôn chạy lại test suite: `python -m pytest tests -v` (đảm bảo 24/24 tests pass) khi thực hiện bất kỳ sửa đổi nào.
-3. **Giữ vững nguyên tắc cốt lõi**:
-   - Không can thiệp sửa đổi firmware X3 (0% brick risk).
-   - Duy trì cấu trúc thư mục độc lập trong `backend/` và `android/`.
+1. **Test thực tế trên máy đọc sách Xteink X3 thật**:
+   - Kết nối máy X3 thật vào Wi-Fi hoặc Điểm phát sóng di động (Hotspot) của điện thoại Android.
+   - Nhập URL: `http://ztruyen.local:8080/opds` hoặc `http://192.168.43.1:8080/opds` trên OPDS Browser của CrossVi / KOReader.
+   - Kiểm tra tốc độ duyệt và hiển thị bìa sách trên màn hình E-ink thật.
+2. **Nâng cấp gói cài đặt 1-Click APK (Roadmap Cấp 2)**:
+   - Nghiên cứu đóng gói Z-Truyen Backend thành file `.apk` độc lập (sử dụng Python-for-Android / Kivy / Termux GUI wrapper) để người dùng không chuyên chỉ cần bấm 1 nút là mở server.
+3. **Quy trình làm việc chuẩn cho Agent**:
+   - Khi sửa code, luôn chạy test: `python -m pytest tests -v` (đảm bảo 28/28 tests PASS).
+   - Tự động `git add`, `git commit` và `git push origin main`.
+   - Báo người dùng cập nhật trên điện thoại bằng đúng 1 lệnh: `ztruyen-update`.
