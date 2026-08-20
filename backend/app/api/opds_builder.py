@@ -340,8 +340,8 @@ class OpdsBuilder:
         clean_title = clean_story_title(story.title)
         escaped_title = html.escape(clean_title)
         acronym = get_story_acronym(clean_title)
-        clean_author = clean_title if (not story.author or story.author == "Đang cập nhật") else story.author
-        escaped_author = html.escape(clean_author)
+        # Entry author MUST be the story title so X3 displays story title on row 2 and downloads to /books/{Story Title}/
+        escaped_story_name = escaped_title
         escaped_desc = html.escape(story.description or f"Tác phẩm {clean_title}")
         feed_id = f"urn:ztruyen:book:{story.source_id}:{story.slug}"
         self_url = f"{base_url}/opds/book/{story.source_id}/{story.slug}"
@@ -385,7 +385,7 @@ class OpdsBuilder:
         <title>{acronym}_Chương 1</title>
         <id>urn:ztruyen:chapter:{story.source_id}:{story.slug}:c0001</id>
         <updated>{now}</updated>
-        <author><name>{escaped_author}</name></author>
+        <author><name>{escaped_story_name}</name></author>
         <summary type="text">{escaped_title} — Tải nhanh chương 1 để đọc tức thì.</summary>
         <link rel="http://opds-spec.org/acquisition" href="{html.escape(c1_url)}" type="application/epub+zip" title="Tải &amp; Đọc Chương 1"/>
         {cover_tags}
@@ -397,7 +397,7 @@ class OpdsBuilder:
         <title>{acronym}_Trọn Bộ_chương 1-{total_ch}</title>
         <id>urn:ztruyen:volume:{story.source_id}:{story.slug}:all</id>
         <updated>{now}</updated>
-        <author><name>{escaped_author}</name></author>
+        <author><name>{escaped_story_name}</name></author>
         <summary type="text">{escaped_title} — Tải toàn bộ {total_ch} chương thành 1 file EPUB hoàn chỉnh để lưu offline.</summary>
         <link rel="http://opds-spec.org/acquisition" href="{html.escape(all_url)}" type="application/epub+zip" title="Tải Trọn Bộ ({total_ch} Chương)"/>
         {cover_tags}
@@ -417,7 +417,7 @@ class OpdsBuilder:
         <title>{html.escape(vol_title)}</title>
         <id>{vol_id}</id>
         <updated>{now}</updated>
-        <author><name>{escaped_author}</name></author>
+        <author><name>{escaped_story_name}</name></author>
         <summary type="text">{escaped_title} — Bao gồm {s['count']} chương ({start_ch} đến {end_ch}). Chuẩn hóa KOSync cho Xteink X3.</summary>
         <link rel="http://opds-spec.org/acquisition"
               href="{html.escape(download_url)}"
@@ -556,8 +556,8 @@ class OpdsBuilder:
         clean_title = clean_story_title(story.title)
         escaped_title = html.escape(clean_title)
         acronym = get_story_acronym(clean_title)
-        clean_author = clean_title if (not story.author or story.author == "Đang cập nhật") else story.author
-        escaped_author = html.escape(clean_author)
+        # Entry author MUST be the story title so X3 displays story title on row 2 and downloads to /books/{Story Title}/
+        escaped_story_name = escaped_title
         escaped_desc = html.escape(story.description or f"Tác phẩm {clean_title}")
 
         feed_id_suffix = f":{range_label}" if range_label else f":{sort_order}"
@@ -589,7 +589,7 @@ class OpdsBuilder:
         <title>{html.escape(display_chap_title)}</title>
         <id>{chap_id}</id>
         <updated>{now}</updated>
-        <author><name>{escaped_author}</name></author>
+        <author><name>{escaped_story_name}</name></author>
         <summary type="text">{html.escape(formatted_title)}</summary>
         <link rel="http://opds-spec.org/acquisition"
               href="{html.escape(download_url)}"
