@@ -224,7 +224,36 @@
   3. Nâng cấp `cover_service.get_or_create_cover` tự động cập nhật ảnh bìa chất lượng cao khi có `cover_url`.
   4. Đã kiểm tra thực tế: EPUB của *Thiên La* được tạo với ảnh bìa `cover.jpg` 29KB chuẩn E-ink, tên viết tắt chuẩn `TL_Tập 01_chương 1-50.epub`.
 
-### 15. RULE-001: Nguyên Tắc Bất Di Bất Dịch — Giữ 100% Stock Factory Firmware
+### 15. BUG-013: Lỗi Thư Mục Tải Về Trên SDCard Bị Đặt Tên Theo Tác Giả Thay Vì Tên Truyện
+- **Triệu chứng**: Khi tải sách trên máy X3, các file EPUB được lưu vào thư mục `SDCard/Books/{Tên Tác Giả}/...` (hoặc `SDCard/Books/Đang cập nhật/...`) thay vì theo đúng tên truyện `SDCard/Books/{Tên Truyện}/...`.
+- **Nguyên nhân gốc rễ**:
+  - Trong firmware CrossVi / CrossPoint (`OpdsBookBrowserActivity.cpp`), khi người dùng tải một entry sách kiểu `BOOK`, firmware tự động tạo thư mục con dựa trên giá trị của thẻ `<author><name>` trong OPDS feed.
+  - Nếu Backend truyền `<author><name>{story.author}</name>` vào feed tải tập/chương, firmware sẽ tạo thư mục theo tác giả.
+- **Cách khắc phục**:
+  - Trong `backend/app/api/opds_builder.py` (`build_book_volumes_feed` và `build_book_chapters_feed`), gán `<author><name>{story.title}</name>` cho các entry tải file EPUB.
+  - Firmware X3 sẽ tự động tạo thư mục con theo đúng tên truyện: `SDCard/Books/{Tên Truyện}/{Tên Viết Tắt}_Tập X_chương A-B.epub`.
+
+### 16. FEAT-001: Tái Cấu Trúc Menu Chính OPDS & Hỗ Trợ Tìm Kiếm Tiếng Việt Không Dấu Cho E-ink
+- **Bối cảnh & Yêu cầu**:
+  - Giao diện ban đầu hiển thị tràn lan các danh mục của nhiều nguồn truyện khiến người dùng trên màn hình nhỏ E-ink khó thao tác.
+  - Bàn phím ảo trên firmware X3 chỉ hỗ trợ ký tự Latin (ASCII), không có bộ gõ tiếng Việt Telex/VNI.
+- **Giải pháp triển khai**:
+  1. **Menu Chính 8 mục tinh gọn**:
+     - `🌐 Chọn Nguồn Truyện`: Vào danh sách nguồn truyện để chuyển đổi.
+     - `📚 Nguồn: [Tên Nguồn Hiện Tại]`: Hiển thị nguồn đang kích hoạt.
+     - `📖 Đọc Tiếp: [Tên Truyện] (Chương X)`: Dẫn trực tiếp đến danh sách chương truyện tải gần nhất.
+     - `⚡ Truyện Mới Cập Nhật`: Lọc theo nguồn hiện tại.
+     - `🔥 Truyện Hot & Đọc Nhiều`: Lọc theo nguồn hiện tại.
+     - `✅ Truyện Hoàn Thành (Full Trọn Bộ)`: Lọc theo nguồn hiện tại.
+     - `📂 Thể Loại Truyện`: Lọc theo nguồn hiện tại.
+     - `🔍 Tìm Truyện (Không Dấu & Có Dấu)`: Lọc theo nguồn hiện tại.
+  2. **Ghi nhớ nguồn kích hoạt (Active Source)**:
+     - Lưu trạng thái vào bảng SQLite `active_source` qua `repo.set_active_source(source_id)` và `repo.get_active_source()`.
+  3. **Bộ tìm kiếm tiếng Việt không dấu (`remove_accents`)**:
+     - Chuẩn hóa Unicode loại bỏ dấu tiếng Việt, so khớp đa nhánh (direct search, slug search, và unaccented title scoring).
+     - Cho phép gõ `muc than ky`, `thien la`, `con duong ba chu` tìm ra đúng tác phẩm ngay lập tức.
+
+### 17. RULE-001: Nguyên Tắc Bất Di Bất Dịch — Giữ 100% Stock Factory Firmware
 - **Quy tắc**: Tuyệt đối **KHÔNG** chỉnh sửa hoặc can thiệp vào mã nguồn firmware gốc của CrossPoint Reader / Xteink X3 để đạt được mục đích.
 - **Lý do**: Máy đọc sách Xteink X3 vật lý ngoài đời chạy firmware gốc xuất xưởng của nhà sản xuất (hoặc bản flash release chính thức). Người dùng không thể và không nên tùy tiện flash custom firmware vì rủi ro brick máy cao.
 - **Giải pháp chuẩn**: Mọi tính năng (danh sách chương, tiếp tục đọc, phân loại danh mục, ảnh bìa, gom tập KOSync) phải được hiện thực hoàn toàn 100% phía **Backend Server OPDS** theo đúng đặc tả Atom / OPDS 1.2 RFC.
