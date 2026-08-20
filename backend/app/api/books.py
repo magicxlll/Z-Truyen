@@ -242,13 +242,6 @@ async def download_epub(
                 story_slug=story_slug,
                 chap_order=chap_order,
             )
-            # Update last read progress
-            repo.set_last_read(
-                source_id=source_id,
-                story_slug=story_slug,
-                story_title=story_slug,
-                chap_order=chap_order,
-            )
             # Trigger background prefetch
             asyncio.create_task(
                 volume_bundler.prefetch_and_cleanup(
@@ -266,6 +259,26 @@ async def download_epub(
             )
         else:
             raise HTTPException(status_code=400, detail="Unrecognized EPUB filename format")
+
+        # Update last read progress with real story title
+        try:
+            story_obj = repo.get_story(source_id, story_slug)
+            real_title = story_obj.title if (story_obj and story_obj.title) else story_slug
+            read_order = 1
+            if m_single:
+                read_order = int(m_single.group(1))
+            elif m_vol:
+                read_order = (int(m_vol.group(1)) - 1) * 50 + 1
+            elif m_range:
+                read_order = int(m_range.group(1))
+            repo.set_last_read(
+                source_id=source_id,
+                story_slug=story_slug,
+                story_title=real_title,
+                chap_order=read_order,
+            )
+        except Exception as e:
+            logger.debug(f"Failed to update last_read on download: {e}")
 
         if not epub_path.is_file():
             raise HTTPException(status_code=500, detail="EPUB build completed but file not found on disk")

@@ -60,121 +60,107 @@ class OpdsBuilder:
         current_source_id: str | None = None,
         base_url: str = "",
     ) -> str:
-        """Construct Root OPDS Catalog Feed directly listing available story sources and key categories."""
+        """Construct Root OPDS Catalog Feed matching X3 streamlined menu."""
         now = format_iso_time()
+        active_src = current_source_id or "akaytruyen"
+
+        current_name = "AkayTruyen"
+        if active_src == "storyaclick":
+            current_name = "Storya.click"
+        elif active_src == "conduongbachu":
+            current_name = "Con Đường Bá Chủ"
+        elif active_src == "all":
+            current_name = "Tất Cả Nguồn"
+
+        source_param = f"?source={active_src}" if active_src != "all" else ""
+        source_param_amp = f"&amp;source={active_src}" if active_src != "all" else ""
+
         entries: list[str] = []
 
-        # 1. TẤT CẢ NGUỒN TRUYỆN
+        # 1. CHỌN NGUỒN TRUYỆN
         entries.append(f"""    <entry>
         <title>🌐 Chọn Nguồn Truyện</title>
         <id>urn:ztruyen:category:sources</id>
         <updated>{now}</updated>
-        <content type="text">Khám phá theo từng kho truyện: Storya.click, AkayTruyen, Con Đường Bá Chủ...</content>
+        <content type="text">Khám phá các kho truyện: AkayTruyen, Storya.click, Con Đường Bá Chủ...</content>
         <link rel="subsection" href="{html.escape(base_url)}/opds/sources" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
     </entry>""")
 
-        # Nguồn Hiện Tại
-        current_name = "Tất Cả Nguồn (Storya, Akay, CĐBC)"
-        if current_source_id == "storyaclick":
-            current_name = "Storya.click"
-        elif current_source_id == "akaytruyen":
-            current_name = "AkayTruyen"
-        elif current_source_id == "conduongbachu":
-            current_name = "Con Đường Bá Chủ"
-
+        # 2. NGUỒN HIỆN TẠI
         entries.append(f"""    <entry>
-        <title>📚 Nguồn Hiện Tại: {html.escape(current_name)}</title>
+        <title>📚 Nguồn: {html.escape(current_name)}</title>
         <id>urn:ztruyen:source:current</id>
         <updated>{now}</updated>
-        <content type="text">Đang xem kho truyện từ: {html.escape(current_name)}</content>
+        <content type="text">Đang xem kho truyện từ: {html.escape(current_name)}. Bấm để đổi nguồn.</content>
         <link rel="subsection" href="{html.escape(base_url)}/opds/sources" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
     </entry>""")
 
-        # 2. KHO TRUYỆN: STORYA.CLICK
-        entries.append(f"""    <entry>
-        <title>📚 Kho Truyện: Storya.click</title>
-        <id>urn:ztruyen:source:storyaclick</id>
-        <updated>{now}</updated>
-        <content type="text">Khám phá hàng ngàn truyện dịch &amp; convert từ Storya.click.</content>
-        <link rel="subsection" href="{html.escape(base_url)}/opds/source/storyaclick" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
-    </entry>""")
-
-        # 3. KHO TRUYỆN: AKAYTRUYEN
-        entries.append(f"""    <entry>
-        <title>📚 Kho Truyện: AkayTruyen</title>
-        <id>urn:ztruyen:source:akaytruyen</id>
-        <updated>{now}</updated>
-        <content type="text">Tuyển tập tác phẩm đặc sắc từ AkayTruyen.</content>
-        <link rel="subsection" href="{html.escape(base_url)}/opds/source/akaytruyen" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
-    </entry>""")
-
-        # 4. KHO TRUYỆN: CON ĐƯỜNG BÁ CHỦ
-        entries.append(f"""    <entry>
-        <title>📚 Kho Truyện: Con Đường Bá Chủ</title>
-        <id>urn:ztruyen:source:conduongbachu</id>
-        <updated>{now}</updated>
-        <content type="text">Trang chuyên biệt tiểu thuyết Con Đường Bá Chủ (Full &amp; Ngoại truyện).</content>
-        <link rel="subsection" href="{html.escape(base_url)}/opds/source/conduongbachu" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
-    </entry>""")
-
-        # 5. TRUYỆN MỚI CẬP NHẬT (TẤT CẢ NGUỒN)
-        entries.append(f"""    <entry>
-        <title>⚡ Truyện Mới Cập Nhật (Tổng hợp)</title>
-        <id>urn:ztruyen:category:latest</id>
-        <updated>{now}</updated>
-        <content type="text">Các tác phẩm và chương truyện mới cập nhật từ tất cả nguồn.</content>
-        <link rel="subsection" href="{html.escape(base_url)}/opds/latest" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
-    </entry>""")
-
-        # 6. TRUYỆN HOT & ĐỌC NHIỀU
-        entries.append(f"""    <entry>
-        <title>🔥 Truyện Hot &amp; Đọc Nhiều</title>
-        <id>urn:ztruyen:category:hot</id>
-        <updated>{now}</updated>
-        <content type="text">Danh sách các bộ truyện được đọc nhiều nhất.</content>
-        <link rel="subsection" href="{html.escape(base_url)}/opds/hot" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
-    </entry>""")
-
-        # 7. TRUYỆN HOÀN THÀNH
-        entries.append(f"""    <entry>
-        <title>✅ Truyện Hoàn Thành (Full Trọn Bộ)</title>
-        <id>urn:ztruyen:category:completed</id>
-        <updated>{now}</updated>
-        <content type="text">Tuyển tập các bộ truyện đã hoàn tất trọn bộ.</content>
-        <link rel="subsection" href="{html.escape(base_url)}/opds/completed" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
-    </entry>""")
-
-        # 8. THỂ LOẠI TRUYỆN
-        entries.append(f"""    <entry>
-        <title>📂 Thể Loại Truyện</title>
-        <id>urn:ztruyen:category:genres</id>
-        <updated>{now}</updated>
-        <content type="text">Duyệt truyện theo thể loại: Tiên Hiệp, Kiếm Hiệp, Huyền Huyễn, Linh Dị...</content>
-        <link rel="subsection" href="{html.escape(base_url)}/opds/genres" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
-    </entry>""")
-
-        # 9. TÌM KIẾM TRUYỆN
-        entries.append(f"""    <entry>
-        <title>🔍 Tìm Kiếm Truyện</title>
-        <id>urn:ztruyen:category:search</id>
-        <updated>{now}</updated>
-        <content type="text">Nhập từ khóa tìm kiếm tác phẩm trên bàn phím ảo.</content>
-        <link rel="search" href="{html.escape(base_url)}/opds/search?q={{searchTerms}}" type="application/atom+xml"/>
-    </entry>""")
-
-        # 10. ĐỌC TIẾP (Nếu có truyện vừa đọc)
+        # 3. ĐỌC TIẾP TRUYỆN [hiện đường dẫn đến danh sách chương truyện đc tải gần đây nhất]
         if last_read:
-            story_title = clean_story_title(last_read.get("story_title", "Truyện vừa đọc"))
-            source_id = last_read.get("source_id", "storyaclick")
+            story_title = clean_story_title(last_read.get("story_title") or "Truyện vừa đọc")
+            source_id = last_read.get("source_id", active_src)
             story_slug = last_read.get("story_slug", "")
             chap_order = last_read.get("chap_order", 1)
             continue_url = f"{base_url}/opds/book/{source_id}/{story_slug}/chapters?start={chap_order}&limit=50&sort=asc"
             entries.append(f"""    <entry>
         <title>📖 Đọc Tiếp: {html.escape(story_title)} (Chương {chap_order})</title>
-        <id>urn:ztruyen:continue:{source_id}:{story_slug}</id>
+        <id>urn:ztruyen:action:continue</id>
         <updated>{now}</updated>
-        <content type="text">Tiếp tục đọc {html.escape(story_title)} (lần đọc gần nhất: Chương {chap_order})</content>
+        <content type="text">Danh sách chương {html.escape(story_title)} (lần tải/đọc gần nhất: Chương {chap_order})</content>
         <link rel="subsection" href="{html.escape(continue_url)}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+    </entry>""")
+        else:
+            entries.append(f"""    <entry>
+        <title>📖 Đọc Tiếp Truyện (Chưa có lịch sử)</title>
+        <id>urn:ztruyen:action:continue</id>
+        <updated>{now}</updated>
+        <content type="text">Chưa có tác phẩm nào được tải hoặc đọc gần đây.</content>
+        <link rel="subsection" href="{html.escape(base_url)}/opds/latest{source_param}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+    </entry>""")
+
+        # 4. TRUYỆN MỚI CẬP NHẬT [của nguồn hiện tại]
+        entries.append(f"""    <entry>
+        <title>⚡ Truyện Mới Cập Nhật</title>
+        <id>urn:ztruyen:category:latest</id>
+        <updated>{now}</updated>
+        <content type="text">Các tác phẩm và chương mới cập nhật từ {html.escape(current_name)}.</content>
+        <link rel="subsection" href="{html.escape(base_url)}/opds/latest{source_param}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+    </entry>""")
+
+        # 5. TRUYỆN HOT [của nguồn hiện tại]
+        entries.append(f"""    <entry>
+        <title>🔥 Truyện Hot &amp; Đọc Nhiều</title>
+        <id>urn:ztruyen:category:hot</id>
+        <updated>{now}</updated>
+        <content type="text">Danh sách các bộ truyện được đọc nhiều nhất từ {html.escape(current_name)}.</content>
+        <link rel="subsection" href="{html.escape(base_url)}/opds/hot{source_param}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+    </entry>""")
+
+        # 6. TRUYỆN HOÀN THÀNH [của nguồn hiện tại]
+        entries.append(f"""    <entry>
+        <title>✅ Truyện Hoàn Thành (Full Trọn Bộ)</title>
+        <id>urn:ztruyen:category:completed</id>
+        <updated>{now}</updated>
+        <content type="text">Tuyển tập các bộ truyện đã hoàn tất trọn bộ từ {html.escape(current_name)}.</content>
+        <link rel="subsection" href="{html.escape(base_url)}/opds/completed{source_param}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+    </entry>""")
+
+        # 7. THỂ LOẠI [của nguồn hiện tại]
+        entries.append(f"""    <entry>
+        <title>📂 Thể Loại Truyện</title>
+        <id>urn:ztruyen:category:genres</id>
+        <updated>{now}</updated>
+        <content type="text">Duyệt truyện theo thể loại từ {html.escape(current_name)}.</content>
+        <link rel="subsection" href="{html.escape(base_url)}/opds/genres{source_param}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+    </entry>""")
+
+        # 8. TÌM TRUYỆN [của nguồn hiện tại]-[cho phép tìm kiếm bằng tiếng việt không dấu]
+        entries.append(f"""    <entry>
+        <title>🔍 Tìm Truyện (Không Dấu &amp; Có Dấu)</title>
+        <id>urn:ztruyen:category:search</id>
+        <updated>{now}</updated>
+        <content type="text">Tìm kiếm tác phẩm từ {html.escape(current_name)} (hỗ trợ gõ tiếng Việt không dấu trên bàn phím ảo).</content>
+        <link rel="search" href="{html.escape(base_url)}/opds/search?q={{searchTerms}}{source_param_amp}" type="application/atom+xml"/>
     </entry>""")
 
         entries_str = "\n".join(entries)
@@ -191,7 +177,7 @@ class OpdsBuilder:
     </author>
     <link rel="self" href="{html.escape(base_url)}/opds" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
     <link rel="start" href="{html.escape(base_url)}/opds" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
-    <link rel="search" href="{html.escape(base_url)}/opds/search?q={{searchTerms}}" type="application/atom+xml"/>
+    <link rel="search" href="{html.escape(base_url)}/opds/search?q={{searchTerms}}{source_param_amp}" type="application/atom+xml"/>
 
 {entries_str}
 </feed>

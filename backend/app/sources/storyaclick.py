@@ -41,21 +41,57 @@ class StoryaClickAdapter:
         if not query or not query.strip():
             return await self.get_latest(page)
 
-        encoded = quote_plus(query.strip())
-        data = await self._api_get(f"/stories/search?q={encoded}")
-        items = data.get("data", [])
+        from app.domain.sanitizer import remove_accents
+        from app.domain.ids import slugify
+
+        q_clean = query.strip()
+        encoded = quote_plus(q_clean)
         results: list[StorySummary] = []
-        for item in items:
-            slug = item.get("slug") or ""
-            results.append(
-                StorySummary(
-                    source_id=self.id,
-                    slug=slug,
-                    title=item.get("title") or "Chưa có tiêu đề",
-                    author=item.get("author", {}).get("name", "Đang cập nhật") if isinstance(item.get("author"), dict) else "Đang cập nhật",
-                    cover_url=self._fix_cover_url(item.get("coverUrl")),
-                )
-            )
+        seen_slugs: set[str] = set()
+
+        # 1. Direct API search
+        try:
+            data = await self._api_get(f"/stories/search?q={encoded}")
+            items = data.get("data", []) if isinstance(data, dict) else []
+            for item in items:
+                slug = item.get("slug") or ""
+                if slug and slug not in seen_slugs:
+                    seen_slugs.add(slug)
+                    results.append(
+                        StorySummary(
+                            source_id=self.id,
+                            slug=slug,
+                            title=item.get("title") or "Chưa có tiêu đề",
+                            author=item.get("author", {}).get("name", "Đang cập nhật") if isinstance(item.get("author"), dict) else "Đang cập nhật",
+                            cover_url=self._fix_cover_url(item.get("coverUrl")),
+                        )
+                    )
+        except Exception as e:
+            logger.debug(f"[Storya] Search API failed for '{query}': {e}")
+
+        # 2. If unaccented or returned few results, try direct slug lookup (e.g. muc-than-ky)
+        candidate_slug = slugify(q_clean)
+        if candidate_slug and candidate_slug not in seen_slugs:
+            try:
+                data = await self._api_get(f"/stories/{candidate_slug}")
+                item = data.get("data") if isinstance(data, dict) else None
+                if item and isinstance(item, dict):
+                    slug = item.get("slug") or candidate_slug
+                    if slug not in seen_slugs:
+                        seen_slugs.add(slug)
+                        results.insert(
+                            0,
+                            StorySummary(
+                                source_id=self.id,
+                                slug=slug,
+                                title=item.get("title") or candidate_slug,
+                                author=item.get("author", {}).get("name", "Đang cập nhật") if isinstance(item.get("author"), dict) else "Đang cập nhật",
+                                cover_url=self._fix_cover_url(item.get("coverUrl")),
+                            ),
+                        )
+            except Exception:
+                pass
+
         return results
 
     async def get_hot(self, page: int = 1) -> list[StorySummary]:

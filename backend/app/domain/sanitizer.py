@@ -30,6 +30,16 @@ def clean_vietnamese_text(text: str) -> str:
     return text.strip()
 
 
+def remove_accents(input_str: str) -> str:
+    """Remove Vietnamese tone marks and accents, converting to lowercase unaccented text."""
+    if not input_str:
+        return ""
+    # Replace special Vietnamese chars like đ, Đ
+    s = input_str.replace("đ", "d").replace("Đ", "D")
+    nfkd_form = unicodedata.normalize("NFKD", s)
+    return "".join(c for c in nfkd_form if not unicodedata.combining(c)).lower().strip()
+
+
 def is_junk_paragraph(text: str) -> bool:
     """Check if a paragraph is unwanted noise or advertisement."""
     cleaned = text.strip()

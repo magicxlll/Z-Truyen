@@ -75,16 +75,20 @@ class ConDuongBaChuAdapter:
         return int(match.group(1)) if match else 1
 
     async def search(self, query: str, page: int = 1) -> list[StorySummary]:
+        from app.domain.sanitizer import remove_accents
         results: list[StorySummary] = []
-        q_lower = query.lower().strip() if query else ""
+        q_unaccent = remove_accents(query.strip()) if query else ""
 
         for s in PREDEFINED_STORIES:
+            title_unaccent = remove_accents(s["title"])
+            slug_unaccent = s["slug"].replace("-", " ")
             if (
-                not q_lower
-                or q_lower in s["title"].lower()
-                or "ba chu" in q_lower
-                or "con duong" in q_lower
-                or "ngoai truyen" in q_lower
+                not q_unaccent
+                or q_unaccent in title_unaccent
+                or q_unaccent in slug_unaccent
+                or "ba chu" in q_unaccent
+                or "con duong" in q_unaccent
+                or "ngoai truyen" in q_unaccent
             ):
                 results.append(
                     StorySummary(

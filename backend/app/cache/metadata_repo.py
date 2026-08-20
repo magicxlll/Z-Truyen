@@ -418,5 +418,48 @@ class MetadataRepository:
             except Exception:
                 return None
 
+    # --- Active Source Management ---
+    def set_active_source(self, source_id: str) -> None:
+        now_str = datetime.now().isoformat()
+        with get_connection(self.db_path) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS active_source (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    source_id TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO active_source (id, source_id, updated_at)
+                VALUES (1, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    source_id=excluded.source_id,
+                    updated_at=excluded.updated_at
+                """,
+                (source_id, now_str),
+            )
+
+    def get_active_source(self) -> str:
+        with get_connection(self.db_path) as conn:
+            try:
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS active_source (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        source_id TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+                row = conn.execute("SELECT source_id FROM active_source WHERE id = 1").fetchone()
+                if row and row["source_id"]:
+                    return row["source_id"]
+            except Exception:
+                pass
+        return "akaytruyen"
+
 
 repo = MetadataRepository()

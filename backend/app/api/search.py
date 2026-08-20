@@ -20,26 +20,50 @@ async def search_opds(
 ) -> Response:
     """Search stories matching keywords across sources."""
     base_url = str(request.base_url).rstrip("/")
-    self_url = f"{base_url}/opds/search?q={q}" + (f"&source={source}" if source else "")
+    from app.cache.metadata_repo import repo
+    from app.domain.sanitizer import remove_accents
+
+    active_source = source if source is not None else repo.get_active_source()
+    self_url = f"{base_url}/opds/search?q={q}" + (f"&source={active_source}" if active_source and active_source != "all" else "")
 
     results: list[StorySummary] = []
 
-    if source:
-        adapter = registry.get(source)
+    if active_source and active_source != "all":
+        adapter = registry.get(active_source)
         if adapter:
             try:
                 results = await adapter.search(q, page=page)
             except Exception as e:
-                logger.error(f"Search failed for source '{source}': {e}")
+                logger.error(f"Search failed for source '{active_source}': {e}")
     else:
         results = await registry.search_all(q)
 
-    title = f"Kết quả tìm kiếm: '{q}'" if q else "Tìm kiếm truyện"
+    # Rank results matching unaccented query first
+    if q and results:
+        q_unaccent = remove_accents(q)
+        def _score(item: StorySummary) -> int:
+            t_unaccent = remove_accents(item.title)
+            if t_unaccent == q_unaccent:
+                return 0
+            if t_unaccent.startswith(q_unaccent):
+                return 1
+            if q_unaccent in t_unaccent:
+                return 2
+            return 3
+        results = sorted(results, key=_score)
+
+    source_name = ""
+    if active_source and active_source != "all":
+        adapter = registry.get(active_source)
+        if adapter:
+            source_name = f" ({adapter.name})"
+
+    title = f"Kết quả tìm kiếm: '{q}'{source_name}" if q else f"Tìm kiếm truyện{source_name}"
     from urllib.parse import quote
     safe_q = quote(q.strip()) if q else "all"
 
     xml = OpdsBuilder.build_story_list_feed(
-        feed_id=f"urn:ztruyen:search:{safe_q}",
+        feed_id=f"urn:ztruyen:search:{safe_q}:{active_source or 'all'}",
         title=title,
         stories=results,
         self_url=self_url,

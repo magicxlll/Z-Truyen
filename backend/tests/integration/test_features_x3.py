@@ -18,7 +18,7 @@ async def test_opds_root_sources_at_top():
         text = resp.text
 
         assert "Chọn Nguồn Truyện" in text
-        assert "Nguồn Hiện Tại" in text
+        assert "Nguồn:" in text
         assert "Truyện Mới Cập Nhật" in text
         assert "Truyện Hot" in text
         assert "Truyện Hoàn Thành" in text

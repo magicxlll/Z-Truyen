@@ -21,10 +21,13 @@ ATOM_XML_MEDIA_TYPE = "application/atom+xml;profile=opds-catalog"
 async def get_opds_root(request: Request, source: str | None = None) -> Response:
     """Return the root OPDS 1.2 navigation feed for Xteink X3 and KOReader."""
     base_url = str(request.base_url).rstrip("/")
+    if source:
+        repo.set_active_source(source)
+    active_source = source or repo.get_active_source()
     last_read = repo.get_last_read()
     xml = OpdsBuilder.build_root_feed(
         last_read=last_read,
-        current_source_id=source,
+        current_source_id=active_source,
         base_url=base_url,
     )
     return Response(content=xml, media_type=ATOM_XML_MEDIA_TYPE)
@@ -32,19 +35,31 @@ async def get_opds_root(request: Request, source: str | None = None) -> Response
 
 @router.get("/sources", response_class=Response)
 async def get_opds_sources(request: Request) -> Response:
-    """Return list of supported story sources (clean non-technical presentation)."""
+    """Return list of supported story sources for easy source switching."""
     base_url = str(request.base_url).rstrip("/")
     sources = registry.list_adapters()
+    active_source = repo.get_active_source()
     xml_entries: list[str] = []
 
     for src in sources:
+        is_active = (src.id == active_source)
+        active_mark = " (Đang chọn)" if is_active else ""
         entry_xml = f"""    <entry>
-        <title>📚 {src.name}</title>
+        <title>📚 {src.name}{active_mark}</title>
         <id>urn:ztruyen:source:{src.id}</id>
-        <content type="text">Khám phá tác phẩm từ kho truyện {src.name}</content>
-        <link rel="subsection" href="{base_url}/opds/source/{src.id}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+        <content type="text">Chọn kho truyện {src.name} làm nguồn hoạt động chính.</content>
+        <link rel="subsection" href="{base_url}/opds?source={src.id}" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
     </entry>"""
         xml_entries.append(entry_xml)
+
+    # Option for all sources
+    all_active = " (Đang chọn)" if active_source == "all" else ""
+    xml_entries.append(f"""    <entry>
+        <title>🌐 Tất Cả Nguồn (Tổng Hợp){all_active}</title>
+        <id>urn:ztruyen:source:all</id>
+        <content type="text">Khám phá tổng hợp tác phẩm từ tất cả nguồn truyện.</content>
+        <link rel="subsection" href="{base_url}/opds?source=all" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+    </entry>""")
 
     entries_str = "\n".join(xml_entries)
     xml = f"""<?xml version="1.0" encoding="utf-8"?>
@@ -65,15 +80,17 @@ async def get_opds_sources(request: Request) -> Response:
 @router.get("/source/{source_id}", response_class=Response)
 @router.get("/sources/{source_id}", response_class=Response)
 async def get_opds_source_detail(request: Request, source_id: str) -> Response:
-    """Return dedicated navigation feed for a single story source."""
+    """Select source and return dedicated navigation feed for a single story source."""
     adapter = registry.get(source_id)
-    if not adapter:
+    if not adapter and source_id != "all":
         raise HTTPException(status_code=404, detail=f"Source '{source_id}' not found")
 
+    repo.set_active_source(source_id)
     base_url = str(request.base_url).rstrip("/")
-    xml = OpdsBuilder.build_source_root_feed(
-        source_id=source_id,
-        source_name=adapter.name,
+    last_read = repo.get_last_read()
+    xml = OpdsBuilder.build_root_feed(
+        last_read=last_read,
+        current_source_id=source_id,
         base_url=base_url,
     )
     return Response(content=xml, media_type=ATOM_XML_MEDIA_TYPE)
@@ -84,13 +101,14 @@ async def get_opds_source_detail(request: Request, source_id: str) -> Response:
 async def get_opds_hot(request: Request, page: int = 1, source: str | None = None) -> Response:
     """Return trending and popular stories across active sources (or single source)."""
     base_url = str(request.base_url).rstrip("/")
-    cache_key = f"feed:hot:{source or 'all'}:{page}"
+    active_source = source if source is not None else repo.get_active_source()
+    cache_key = f"feed:hot:{active_source or 'all'}:{page}"
 
     async def _fetch():
-        if source:
-            adapter = registry.get(source)
+        if active_source and active_source != "all":
+            adapter = registry.get(active_source)
             adapters = [adapter] if adapter else []
-            title = adapter.name if adapter else source
+            title = f"🔥 Truyện Hot — {adapter.name if adapter else active_source}"
         else:
             adapters = registry.list_adapters()
             title = "🔥 Truyện Hot & Đọc Nhiều (Tất Cả Nguồn)"
@@ -108,12 +126,13 @@ async def get_opds_hot(request: Request, page: int = 1, source: str | None = Non
 
     title, combined_stories = await fast_cache.get_or_set(cache_key, _fetch, ttl=300)
 
-    self_url = f"{base_url}/opds/hot?page={page}" + (f"&source={source}" if source else "")
-    prev_url = f"{base_url}/opds/hot?page={page - 1}" + (f"&source={source}" if source else "") if page > 1 else None
-    next_url = f"{base_url}/opds/hot?page={page + 1}" + (f"&source={source}" if source else "") if len(combined_stories) >= 10 else None
+    source_param = f"&source={active_source}" if active_source and active_source != "all" else ""
+    self_url = f"{base_url}/opds/hot?page={page}{source_param}"
+    prev_url = f"{base_url}/opds/hot?page={page - 1}{source_param}" if page > 1 else None
+    next_url = f"{base_url}/opds/hot?page={page + 1}{source_param}" if len(combined_stories) >= 10 else None
 
     xml = OpdsBuilder.build_story_list_feed(
-        feed_id=f"urn:ztruyen:category:hot:{source or 'all'}:{page}",
+        feed_id=f"urn:ztruyen:category:hot:{active_source or 'all'}:{page}",
         title=title,
         stories=combined_stories,
         self_url=self_url,
@@ -130,13 +149,14 @@ async def get_opds_hot(request: Request, page: int = 1, source: str | None = Non
 async def get_opds_latest(request: Request, page: int = 1, source: str | None = None) -> Response:
     """Return newest updated stories."""
     base_url = str(request.base_url).rstrip("/")
-    cache_key = f"feed:latest:{source or 'all'}:{page}"
+    active_source = source if source is not None else repo.get_active_source()
+    cache_key = f"feed:latest:{active_source or 'all'}:{page}"
 
     async def _fetch():
-        if source:
-            adapter = registry.get(source)
+        if active_source and active_source != "all":
+            adapter = registry.get(active_source)
             adapters = [adapter] if adapter else []
-            title = adapter.name if adapter else source
+            title = f"⚡ Truyện Mới Cập Nhật — {adapter.name if adapter else active_source}"
         else:
             adapters = registry.list_adapters()
             title = "⚡ Truyện Mới Cập Nhật (Tất Cả Nguồn)"
@@ -154,12 +174,13 @@ async def get_opds_latest(request: Request, page: int = 1, source: str | None = 
 
     title, combined_stories = await fast_cache.get_or_set(cache_key, _fetch, ttl=300)
 
-    self_url = f"{base_url}/opds/latest?page={page}" + (f"&source={source}" if source else "")
-    prev_url = f"{base_url}/opds/latest?page={page - 1}" + (f"&source={source}" if source else "") if page > 1 else None
-    next_url = f"{base_url}/opds/latest?page={page + 1}" + (f"&source={source}" if source else "") if len(combined_stories) >= 10 else None
+    source_param = f"&source={active_source}" if active_source and active_source != "all" else ""
+    self_url = f"{base_url}/opds/latest?page={page}{source_param}"
+    prev_url = f"{base_url}/opds/latest?page={page - 1}{source_param}" if page > 1 else None
+    next_url = f"{base_url}/opds/latest?page={page + 1}{source_param}" if len(combined_stories) >= 10 else None
 
     xml = OpdsBuilder.build_story_list_feed(
-        feed_id=f"urn:ztruyen:category:latest:{source or 'all'}:{page}",
+        feed_id=f"urn:ztruyen:category:latest:{active_source or 'all'}:{page}",
         title=title,
         stories=combined_stories,
         self_url=self_url,
@@ -175,13 +196,14 @@ async def get_opds_latest(request: Request, page: int = 1, source: str | None = 
 async def get_opds_completed(request: Request, page: int = 1, source: str | None = None) -> Response:
     """Return completed / full stories."""
     base_url = str(request.base_url).rstrip("/")
-    cache_key = f"feed:completed:{source or 'all'}:{page}"
+    active_source = source if source is not None else repo.get_active_source()
+    cache_key = f"feed:completed:{active_source or 'all'}:{page}"
 
     async def _fetch():
-        if source:
-            adapter = registry.get(source)
+        if active_source and active_source != "all":
+            adapter = registry.get(active_source)
             adapters = [adapter] if adapter else []
-            title = adapter.name if adapter else source
+            title = f"✅ Truyện Hoàn Thành — {adapter.name if adapter else active_source}"
         else:
             adapters = registry.list_adapters()
             title = "✅ Truyện Hoàn Thành (Full Trọn Bộ)"
@@ -199,12 +221,13 @@ async def get_opds_completed(request: Request, page: int = 1, source: str | None
 
     title, combined_stories = await fast_cache.get_or_set(cache_key, _fetch, ttl=600)
 
-    self_url = f"{base_url}/opds/completed?page={page}" + (f"&source={source}" if source else "")
-    prev_url = f"{base_url}/opds/completed?page={page - 1}" + (f"&source={source}" if source else "") if page > 1 else None
-    next_url = f"{base_url}/opds/completed?page={page + 1}" + (f"&source={source}" if source else "") if len(combined_stories) >= 10 else None
+    source_param = f"&source={active_source}" if active_source and active_source != "all" else ""
+    self_url = f"{base_url}/opds/completed?page={page}{source_param}"
+    prev_url = f"{base_url}/opds/completed?page={page - 1}{source_param}" if page > 1 else None
+    next_url = f"{base_url}/opds/completed?page={page + 1}{source_param}" if len(combined_stories) >= 10 else None
 
     xml = OpdsBuilder.build_story_list_feed(
-        feed_id=f"urn:ztruyen:category:completed:{source or 'all'}:{page}",
+        feed_id=f"urn:ztruyen:category:completed:{active_source or 'all'}:{page}",
         title=title,
         stories=combined_stories,
         self_url=self_url,
@@ -217,13 +240,22 @@ async def get_opds_completed(request: Request, page: int = 1, source: str | None
 
 @router.get("/genres", response_class=Response)
 @router.get("/the-loai", response_class=Response)
-async def get_opds_genres(request: Request) -> Response:
-    """Return list of supported story genres across sources."""
+async def get_opds_genres(request: Request, source: str | None = None) -> Response:
+    """Return list of supported story genres for active source (or all sources)."""
     base_url = str(request.base_url).rstrip("/")
-    cache_key = "feed:genres"
+    active_source = source if source is not None else repo.get_active_source()
+    cache_key = f"feed:genres:{active_source or 'all'}"
 
     async def _fetch():
-        tasks = [a.get_genres() for a in registry.list_adapters()]
+        if active_source and active_source != "all":
+            adapter = registry.get(active_source)
+            adapters = [adapter] if adapter else []
+            source_name = adapter.name if adapter else active_source
+        else:
+            adapters = registry.list_adapters()
+            source_name = "Tất Cả Nguồn"
+
+        tasks = [a.get_genres() for a in adapters]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         all_genres = []
@@ -234,17 +266,19 @@ async def get_opds_genres(request: Request) -> Response:
                     if g.slug not in seen_slugs:
                         seen_slugs.add(g.slug)
                         all_genres.append(g)
-        return all_genres
+        return source_name, all_genres
 
-    all_genres = await fast_cache.get_or_set(cache_key, _fetch, ttl=1800)
+    source_name, all_genres = await fast_cache.get_or_set(cache_key, _fetch, ttl=1800)
 
     xml_entries: list[str] = []
+    source_query = f"&source={active_source}" if active_source and active_source != "all" else ""
     for g in all_genres:
+        search_url = f"{base_url}/opds/search?q={g.name}{source_query}"
         entry_xml = f"""    <entry>
         <title>{g.name}</title>
         <id>urn:ztruyen:genre:{g.slug}</id>
-        <content type="text">Khám phá thể loại {g.name}</content>
-        <link rel="subsection" href="{base_url}/opds/search?q={g.name}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+        <content type="text">Khám phá thể loại {g.name} từ {source_name}</content>
+        <link rel="subsection" href="{search_url}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
     </entry>"""
         xml_entries.append(entry_xml)
 
@@ -253,8 +287,8 @@ async def get_opds_genres(request: Request) -> Response:
 <feed xmlns="http://www.w3.org/2005/Atom"
       xmlns:dc="http://purl.org/dc/terms/"
       xmlns:opds="http://opds-spec.org/2010/catalog">
-    <id>urn:ztruyen:genres</id>
-    <title>📂 Thể Loại Truyện</title>
+    <id>urn:ztruyen:genres:{active_source or 'all'}</id>
+    <title>📂 Thể Loại Truyện ({source_name})</title>
     <link rel="self" href="{base_url}/opds/genres" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
     <link rel="start" href="{base_url}/opds" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
 
