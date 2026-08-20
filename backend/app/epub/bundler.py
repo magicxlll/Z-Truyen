@@ -210,6 +210,7 @@ class VolumeBundler:
             raise ValueError(f"Unknown source adapter '{source_id}'")
 
         story = await adapter.get_story_detail(story_slug)
+        self.repo.upsert_story(story)
         all_chapters = await adapter.get_all_chapters(story_slug)
         target_chap_summary = next(
             (c for c in all_chapters if c.order == chap_order),
@@ -268,7 +269,7 @@ class VolumeBundler:
         for next_order in range(current_chap_order + 1, current_chap_order + 1 + prefetch_count):
             try:
                 next_filename = build_chapter_filename(source_id, story_slug, next_order)
-                if not self.storage.has_epub(next_filename):
+                if not self.storage.has_epub(next_filename, story_slug=story_slug):
                     logger.info(f"[PrefetchEngine] Background caching next chapter {next_order}...")
                     await self.get_or_build_single_chapter(source_id, story_slug, next_order)
             except Exception as e:
@@ -280,8 +281,8 @@ class VolumeBundler:
             clean_until = current_chap_order - cleanup_behind
             for old_order in range(1, clean_until + 1):
                 old_filename = build_chapter_filename(source_id, story_slug, old_order)
-                old_path = self.storage.epub_dir / old_filename
-                if old_path.is_file():
+                old_path = self.storage.get_epub_path(old_filename, story_slug=story_slug)
+                if old_path and old_path.is_file():
                     try:
                         old_path.unlink()
                         logger.info(f"[SmartCache] Auto-cleaned old cached chapter: {old_filename}")
@@ -307,14 +308,14 @@ class VolumeBundler:
         else:
             filename = f"ztruyen_{source_id}_{story_slug}_c{start_order:04d}-{end_order:04d}.epub"
 
-        cached_path = self.storage.get_epub_path(filename)
+        cached_path = self.storage.get_epub_path(filename, story_slug=story_slug)
         if cached_path:
             sha1 = self.storage.calculate_file_sha1(cached_path)
             return cached_path, sha1
 
         lock_key = f"{source_id}:{story_slug}:{filename}"
         async with self._get_lock(lock_key):
-            cached_path = self.storage.get_epub_path(filename)
+            cached_path = self.storage.get_epub_path(filename, story_slug=story_slug)
             if cached_path:
                 sha1 = self.storage.calculate_file_sha1(cached_path)
                 return cached_path, sha1
@@ -324,6 +325,7 @@ class VolumeBundler:
                 raise ValueError(f"Unknown source adapter '{source_id}'")
 
             story = await adapter.get_story_detail(story_slug)
+            self.repo.upsert_story(story)
             all_chapters_summary = await adapter.get_all_chapters(story_slug)
             total_chapters = len(all_chapters_summary)
             if total_chapters == 0:

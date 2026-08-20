@@ -16,7 +16,9 @@
 | **BUG-006** | EPUB Download UX | Nút Tải EPUB không phản hồi do thiếu loading feedback | ✅ Đã khắc phục | 2026-08-19 |
 | **BUG-007** | OPDS UI Layout | Tiêu đề chương trên màn hình e-ink X3 bị tràn & cắt thành `...` | ✅ Đã khắc phục | 2026-08-19 |
 | **BUG-008** | Native Simulator | Biên dịch GCC 15 trên Linux/WSL gặp lỗi narrowing, C23 bool | ✅ Đã khắc phục | 2026-08-19 |
+| **BUG-009** | Storya Scraper / Layout | Lỗi thiếu `import asyncio` và tràn tiêu đề chương X3 | ✅ Đã khắc phục | 2026-08-19 |
 | **BUG-011** | 64-bit Simulator | Lỗi ép kiểu `size_t::max() -> int64_t = -1` gây `exceeds size limit` | ✅ Đã khắc phục | 2026-08-19 |
+| **BUG-012** | AkayTruyen Scraper | Lỗi thiếu ảnh bìa và metadata truyện từ nguồn AkayTruyen | ✅ Đã khắc phục | 2026-08-20 |
 | **DEPLOY-001** | Môi trường Android | Cài đặt toàn bộ 26 packages (FastAPI, EbookLib, Zeroconf...) | 🟢 Hoàn tất 100% | 2026-08-19 |
 | **RULE-001** | Firmware Integrity | Tuyệt đối tuân thủ 100% Stock Factory Firmware của Xteink X3 | 🟢 Tuân thủ 100% | 2026-08-19 |
 
@@ -210,7 +212,19 @@
   - Sửa lại điều kiện kiểm tra kích thước thành: `if (contentLength > 0 && static_cast<uint64_t>(contentLength) > sink.maxBytes)`.
   - Tích hợp bước tự động áp dụng bản vá này vào launcher [`run_crossvi_x3.command`](file:///Users/vietph/Library/CloudStorage/GoogleDrive-vietph.eng@gmail.com/Other%20computers/My%20Computer/DATA/Antigravity/Z-Truyen/Z-Truyen/run_crossvi_x3.command).
 
-### 14. RULE-001: Nguyên Tắc Bất Di Bất Dịch — Giữ 100% Stock Factory Firmware
+### 14. BUG-012: Lỗi Mất Ảnh Bìa & Metadata Truyện Từ Nguồn AkayTruyen (Khắc Phục Toàn Diện)
+- **Triệu chứng**: Khi tải các truyện từ nguồn AkayTruyen (như *Thiên La*, *Chung Cực Truyền Kỳ*, *Lạc Hồn Thôn Nguyên Quyết*...), tên file tải về bị sai thành chữ cái đầu của slug (ví dụ: `T_Tập 01_chương 1-50.epub`), và màn hình Home/Sleep của X3 không hiển thị ảnh bìa truyện.
+- **Nguyên nhân gốc rễ (Root Cause)**:
+  1. Trang chi tiết truyện của AkayTruyen sử dụng cấu trúc DOM `<div class="book-3d"><img src="..." alt="...">` kết hợp các thẻ OpenGraph `<meta property="og:image">`, `<meta property="og:title">`, `<meta property="og:book:author">`.
+  2. Bộ parser cũ trong `AkayTruyenAdapter.get_story_detail` chỉ tìm kiếm `.story-thumb img, .book-cover img` và `h1`, dẫn tới `cover_url` bị trả về `None`, `title` bị fallback về slug `"thien-la"`, và `author` là `"Đang cập nhật"`.
+  3. Khi `cover_url` bị `None`, `bundler.py` và `epub_builder.py` không nhúng được `cover.jpg` vào file EPUB, khiến `generateThumbBmp()` của X3 tạo ra `thumb_226.bmp` rỗng 0 bytes.
+- **Cách khắc phục**:
+  1. Cập nhật `AkayTruyenAdapter.get_story_detail` trích xuất thông tin đa tầng từ OpenGraph `<meta>` và DOM `.book-3d img`.
+  2. Cập nhật `_parse_story_anchors` tự động trích xuất ảnh bìa từ thẻ `img` trong `a` và `a.parent`.
+  3. Nâng cấp `cover_service.get_or_create_cover` tự động cập nhật ảnh bìa chất lượng cao khi có `cover_url`.
+  4. Đã kiểm tra thực tế: EPUB của *Thiên La* được tạo với ảnh bìa `cover.jpg` 29KB chuẩn E-ink, tên viết tắt chuẩn `TL_Tập 01_chương 1-50.epub`.
+
+### 15. RULE-001: Nguyên Tắc Bất Di Bất Dịch — Giữ 100% Stock Factory Firmware
 - **Quy tắc**: Tuyệt đối **KHÔNG** chỉnh sửa hoặc can thiệp vào mã nguồn firmware gốc của CrossPoint Reader / Xteink X3 để đạt được mục đích.
 - **Lý do**: Máy đọc sách Xteink X3 vật lý ngoài đời chạy firmware gốc xuất xưởng của nhà sản xuất (hoặc bản flash release chính thức). Người dùng không thể và không nên tùy tiện flash custom firmware vì rủi ro brick máy cao.
 - **Giải pháp chuẩn**: Mọi tính năng (danh sách chương, tiếp tục đọc, phân loại danh mục, ảnh bìa, gom tập KOSync) phải được hiện thực hoàn toàn 100% phía **Backend Server OPDS** theo đúng đặc tả Atom / OPDS 1.2 RFC.

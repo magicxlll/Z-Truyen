@@ -94,11 +94,12 @@ class CoverService:
         title: str = "",
     ) -> Path:
         """Retrieve cached cover or fetch, convert, and cache it."""
-        cached = self.get_cached_cover_path(source_id, slug)
-        if cached:
-            return cached
-
         target_path = self._get_cover_path(source_id, slug)
+
+        # If already cached and has real cover (or no new cover_url to try)
+        if target_path.is_file() and target_path.stat().st_size > 0:
+            if not cover_url or target_path.stat().st_size > 12000:
+                return target_path
 
         if cover_url:
             try:
@@ -110,6 +111,10 @@ class CoverService:
                     return target_path
             except Exception as e:
                 logger.warning(f"[CoverService] Failed to fetch remote cover ({cover_url}): {e}")
+
+        # If existing cache exists, return it
+        if target_path.is_file() and target_path.stat().st_size > 0:
+            return target_path
 
         # Fallback to generated placeholder
         placeholder_bytes = self.generate_placeholder_cover(title or slug, source_id.upper())

@@ -46,10 +46,10 @@ class AkayTruyenAdapter:
 
             clean_href = href.split("?")[0].split("#")[0].rstrip("/")
             slug = clean_href.split("/")[-1]
-            if not slug:
+            if not slug or slug in ("danh-sach", "the-loai", "tim-kiem"):
                 continue
 
-            img = a.css_first("img")
+            img = a.css_first("img") or (a.parent.css_first("img") if a.parent else None)
             cover_url = None
             if img:
                 cover_url = img.attributes.get("data-src") or img.attributes.get("src")
@@ -69,7 +69,7 @@ class AkayTruyenAdapter:
                 if title and len(title) > len(stories_map[slug].title):
                     stories_map[slug].title = title
             else:
-                if title and not title.startswith("Thể loại"):
+                if title and not title.startswith("Thể loại") and not title.startswith("Chương"):
                     stories_map[slug] = StorySummary(
                         source_id=self.id,
                         slug=slug,
@@ -143,22 +143,62 @@ class AkayTruyenAdapter:
         resp = await self.client.get(url, headers=self._get_headers(), cookies=cookies)
         tree = HTMLParser(resp.text)
 
-        title_node = tree.css_first("h1, .story-title, .title-story")
-        raw_title = title_node.text(strip=True) if title_node else story_slug
-        title = re.sub(r"(?:Đang\s*viết|Hoàn\s*thành|Full|Hot|New|VIP)+$", "", raw_title, flags=re.IGNORECASE).strip()
+        # 1. Title Extraction
+        title = None
+        meta_title = tree.css_first("meta[property='og:title'], meta[name='twitter:title']")
+        if meta_title and meta_title.attributes.get("content"):
+            raw_t = meta_title.attributes.get("content", "")
+            title = re.sub(r"\s*-\s*Akay\s*Truyện.*$", "", raw_t, flags=re.IGNORECASE).strip()
+        if not title:
+            title_node = tree.css_first(".book-3d img, h3, h1, .story-title, .title-story")
+            if title_node:
+                title = title_node.attributes.get("alt") or title_node.text(strip=True)
+        if not title:
+            title = story_slug
+        title = re.sub(r"(?:Đang\s*viết|Hoàn\s*thành|Full|Hot|New|VIP)+$", "", title, flags=re.IGNORECASE).strip()
+        title = re.sub(r"\s+(Full|Hot|New|Đang viết)\s*$", "", title, flags=re.IGNORECASE).strip()
 
-        desc_node = tree.css_first(".desc, [itemprop='description'], .story-description")
-        desc = desc_node.text(strip=True) if desc_node else ""
+        # 2. Author Extraction
+        author = "Đang cập nhật"
+        meta_author = tree.css_first("meta[property='og:book:author']")
+        if meta_author and meta_author.attributes.get("content"):
+            author = meta_author.attributes.get("content", "").strip()
+        if not author or author == "Đang cập nhật":
+            for p in tree.css("p, div, li, span"):
+                if "Tác giả:" in p.text():
+                    author_a = p.css_first("a")
+                    if author_a:
+                        author = author_a.text(strip=True)
+                    else:
+                        m = re.search(r"Tác\s*giả:\s*([^\n<]+)", p.text())
+                        if m:
+                            author = m.group(1).strip()
+                    break
+        if not author or author == "Đang cập nhật":
+            author_node = tree.css_first("[itemprop='author'], .author a, .author")
+            if author_node and author_node.text(strip=True):
+                author = author_node.text(strip=True)
 
-        author_node = tree.css_first("[itemprop='author'], .author a, .author")
-        author = author_node.text(strip=True) if author_node else "Đang cập nhật"
-
-        img_node = tree.css_first(".story-thumb img, .book-cover img, img.cover")
+        # 3. Cover URL Extraction
         cover_url = None
-        if img_node:
-            cover_url = img_node.attributes.get("data-src") or img_node.attributes.get("src")
-            if cover_url and cover_url.startswith("/"):
-                cover_url = f"{self.base_url}{cover_url}"
+        meta_img = tree.css_first("meta[property='og:image'], meta[name='twitter:images0']")
+        if meta_img and meta_img.attributes.get("content"):
+            cover_url = meta_img.attributes.get("content")
+        if not cover_url:
+            img_node = tree.css_first(".book-3d img, img[src*='storage/stories'], .story-thumb img, .book-cover img, img.cover")
+            if img_node:
+                cover_url = img_node.attributes.get("data-src") or img_node.attributes.get("src")
+                if cover_url and cover_url.startswith("/"):
+                    cover_url = f"{self.base_url}{cover_url}"
+
+        # 4. Description Extraction
+        desc = ""
+        meta_desc = tree.css_first("meta[name='description'], meta[property='og:description']")
+        if meta_desc and meta_desc.attributes.get("content"):
+            desc = meta_desc.attributes.get("content", "").strip()
+        if not desc:
+            desc_node = tree.css_first(".desc, [itemprop='description'], .story-description")
+            desc = desc_node.text(strip=True) if desc_node else ""
 
         genres = [a.text(strip=True) for a in tree.css("a[href*='/the-loai/']") if a.text(strip=True)]
 
