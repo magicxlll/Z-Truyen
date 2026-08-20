@@ -68,7 +68,9 @@ class HttpClient:
         params: dict[str, Any] | None = None,
         data: Any = None,
         json: Any = None,
+        timeout: float | None = None,
         max_retries: int = 3,
+        **kwargs: Any,
     ) -> httpx.Response:
         """Execute async HTTP request with concurrency control and exponential backoff retry."""
         client = await self.get_client()
@@ -81,6 +83,8 @@ class HttpClient:
             else:
                 req_headers["Cookie"] = cookie_str
 
+        req_timeout = httpx.Timeout(timeout) if timeout is not None else self.timeout
+
         async with self.semaphore:
             for attempt in range(1, max_retries + 1):
                 try:
@@ -91,6 +95,8 @@ class HttpClient:
                         params=params,
                         data=data,
                         json=json,
+                        timeout=req_timeout,
+                        **kwargs,
                     )
 
                     # If Cloudflare Challenge detected, trigger headless fallback if enabled

@@ -76,12 +76,16 @@ async def test_cover_proxy_endpoint():
 def test_story_subfolder_organization():
     """Verify ObjectStorage organizes EPUBs in story subfolders."""
     test_data = b"PK\x03\x04testepubcontent"
-    filename = "ztruyen_storyaclick_muc-than-ky_v01.epub"
-    saved_path = storage.save_epub(filename, test_data, story_slug="muc-than-ky")
+    filename = "ztruyen_testsource_test-dummy-story_v01.epub"
+    saved_path = storage.save_epub(filename, test_data, story_slug="test-dummy-story")
 
     assert saved_path.is_file()
-    assert "muc-than-ky" in str(saved_path.parent)
-    assert storage.has_epub(filename, story_slug="muc-than-ky")
+    assert "test-dummy-story" in str(saved_path.parent)
+    assert storage.has_epub(filename, story_slug="test-dummy-story")
+
+    # Cleanup
+    if saved_path.is_file():
+        saved_path.unlink()
 
 
 def test_chapter_title_format_clean_syntax():

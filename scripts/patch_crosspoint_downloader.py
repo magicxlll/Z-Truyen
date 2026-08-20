@@ -12,7 +12,14 @@ def patch_downloader():
 
     content = path.read_text(encoding="utf-8")
 
-    # 1. Folder creation
+    # 1. Folder & Filename creation
+    if "opdsBookFilename(book.author, book.title" in content:
+        content = content.replace(
+            "filename += opdsBookFilename(book.author, book.title, static_cast<OpdsFilenameFormat>(SETTINGS.opdsFilenameFormat));",
+            'filename += StringUtils::sanitizeFilename(book.title) + ".epub";'
+        )
+        print("Updated filename to use sanitizeFilename(book.title)")
+
     target1 = 'const char* folder = SETTINGS.opdsDownloadFolder;'
     replacement1 = '''// Base folder: default to /books
   std::string folder = "/books";
@@ -41,12 +48,11 @@ def patch_downloader():
   filename.reserve(96);
   filename += folder;
   filename += '/';
-  filename += opdsBookFilename(book.author, book.title, static_cast<OpdsFilenameFormat>(SETTINGS.opdsFilenameFormat));'''
+  filename += StringUtils::sanitizeFilename(book.title) + ".epub";'''
 
-    # Find the block from target1 until filename += opdsBookFilename...
     idx1 = content.find(target1)
     if idx1 != -1:
-        end_marker = 'filename += opdsBookFilename(book.author, book.title, static_cast<OpdsFilenameFormat>(SETTINGS.opdsFilenameFormat));'
+        end_marker = 'filename += StringUtils::sanitizeFilename(book.title) + ".epub";'
         idx1_end = content.find(end_marker, idx1)
         if idx1_end != -1:
             full_old_block = content[idx1:idx1_end + len(end_marker)]
@@ -67,6 +73,18 @@ def patch_downloader():
     if target2 in content:
         content = content.replace(target2, replacement2)
         print("Successfully patched auto open reader logic!")
+
+    # 3. Update settings.json
+    settings_path = Path("/root/crosspoint-reader/fs_/.crosspoint/settings.json")
+    if settings_path.is_file():
+        import json
+        try:
+            settings_data = json.loads(settings_path.read_text(encoding="utf-8"))
+        except Exception:
+            settings_data = {}
+        settings_data["opdsDownloadFolder"] = "books"
+        settings_path.write_text(json.dumps(settings_data, indent=2), encoding="utf-8")
+        print("Successfully updated settings.json with opdsDownloadFolder = books")
 
     path.write_text(content, encoding="utf-8")
     print("Saved patched file.")

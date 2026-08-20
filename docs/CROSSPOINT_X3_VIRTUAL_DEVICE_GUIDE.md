@@ -37,11 +37,15 @@ Khi cửa sổ máy ảo CrossPoint hiển thị:
 
 1. **Vào Menu Cài Đặt OPDS**:
    - Dùng phím mũi tên di chuyển đến mục **Settings** -> **OPDS Servers** (hoặc mở trực tiếp mục **Wireless / OPDS Browser** trên màn hình chính).
-2. **Thêm Server Z-Truyen**:
-   - URL Server: `http://localhost:8080/opds` (hoặc `http://127.0.0.1:8080/opds`).
-   - Tên Server: `Z-Truyen Local`.
+2. **Danh Sách Server Z-Truyen (Đã Cấu Hình Sẵn)**:
+   - 🏠 1. Android Wi-Fi (192.168.1.15): `http://192.168.1.15:8080/opds`
+   - 🏠 2. Android Wi-Fi (192.168.1.16): `http://192.168.1.16:8080/opds`
+   - 📶 3. Khi phát Hotspot từ điện thoại: `http://192.168.43.1:8080/opds`
+   - 🌐 4. Tự động nhận diện (mDNS Zeroconf): `http://ztruyen.local:8080/opds`
+   - 🏠 5. Android Wi-Fi / 4G (10.168.133.80): `http://10.168.133.80:8080/opds`
+   - 💻 6. Khi chạy Backend trên máy tính: `http://127.0.0.1:8080/opds` (hoặc `http://localhost:8080/opds`)
 3. **Duyệt & Tải Sách**:
-   - Mở **OPDS Browser** -> Chọn **Z-Truyen Local**.
+   - Mở **OPDS Browser** -> Chọn server tương ứng với môi trường đang chạy.
    - Bạn sẽ thấy toàn bộ danh mục:
      - 🌟 *Truyện Mới Cập Nhật*
      - 👑 *Bảng Xếp Hạng Đọc Nhiều*

@@ -29,37 +29,43 @@ cat > fs_/.crosspoint/opds.json << EOF
 {
   "servers": [
     {
-      "name": "Android Termux (192.168.1.22)",
-      "url": "http://192.168.1.22:8080/opds",
+      "name": "1. Android Wi-Fi (192.168.1.15)",
+      "url": "http://192.168.1.15:8080/opds",
       "username": "",
       "password_obf": ""
     },
     {
-      "name": "Android Termux (192.168.1.32)",
-      "url": "http://192.168.1.32:8080/opds",
+      "name": "2. Android Wi-Fi (192.168.1.16)",
+      "url": "http://192.168.1.16:8080/opds",
       "username": "",
       "password_obf": ""
     },
     {
-      "name": "Android Termux (10.176.38.219)",
-      "url": "http://10.176.38.219:8080/opds",
-      "username": "",
-      "password_obf": ""
-    },
-    {
-      "name": "Android Hotspot (192.168.43.1)",
+      "name": "3. Android Hotspot (192.168.43.1)",
       "url": "http://192.168.43.1:8080/opds",
       "username": "",
       "password_obf": ""
     },
     {
-      "name": "PC Localhost (127.0.0.1)",
+      "name": "4. mDNS Auto (ztruyen.local)",
+      "url": "http://ztruyen.local:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "5. Android Wi-Fi (10.168.133.80)",
+      "url": "http://10.168.133.80:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "6. PC Localhost (127.0.0.1)",
       "url": "http://127.0.0.1:8080/opds",
       "username": "",
       "password_obf": ""
     },
     {
-      "name": "PC WSL Gateway",
+      "name": "7. PC WSL Gateway",
       "url": "http://${HOST_IP}:8080/opds",
       "username": "",
       "password_obf": ""
@@ -83,8 +89,20 @@ cat > fs_/.crosspoint/wifi.json << EOF
 }
 EOF
 
-# Ensure download folder is set to books
-if [ ! -f fs_/.crosspoint/settings.json ]; then
+# Ensure download folder is set to books in settings.json
+if [ -f fs_/.crosspoint/settings.json ]; then
+    python3 -c "
+import json
+try:
+    with open('fs_/.crosspoint/settings.json', 'r') as f:
+        d = json.load(f)
+    d['opdsDownloadFolder'] = 'books'
+    with open('fs_/.crosspoint/settings.json', 'w') as f:
+        json.dump(d, f)
+except Exception:
+    pass
+" 2>/dev/null || true
+else
     cat > fs_/.crosspoint/settings.json << EOF
 {
   "opdsDownloadFolder": "books",
@@ -106,7 +124,11 @@ echo "     - Enter / Space: Chọn / Mở sách / Xác nhận (OK)"
 echo "     - ESC / Backspace: Quay lại (Back)"
 echo "     - Chuột trái: Cảm ứng màn hình (Touch/Click)"
 echo "     - Phím P: Nút Nguồn / Khóa máy (Power / Sleep)"
-echo " [!] Kết nối Termux Android: http://192.168.1.22:8080/opds"
+echo " [!] Kết nối Termux Android:"
+echo "     - http://192.168.1.15:8080/opds (Wi-Fi hiện tại)"
+echo "     - http://192.168.1.16:8080/opds (Wi-Fi hiện tại)"
+echo "     - http://192.168.43.1:8080/opds (Hotspot)"
+echo "     - http://ztruyen.local:8080/opds (mDNS Zeroconf)"
 echo "======================================================"
 echo ""
 

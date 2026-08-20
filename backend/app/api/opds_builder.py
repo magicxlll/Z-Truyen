@@ -43,6 +43,14 @@ def format_chapter_title(order: int, raw_title: str, story_title: str = "") -> s
     return f"Chương {order}"
 
 
+def get_story_acronym(title: str) -> str:
+    """Generate uppercase acronym from story title (e.g. 'Mục Thần Ký' -> 'MTK')."""
+    clean = re.sub(r"^[^\w\s]+", "", title).strip()
+    words = clean.split()
+    acronym = "".join(w[0].upper() for w in words if w and w[0].isalnum())
+    return acronym or "ZT"
+
+
 class OpdsBuilder:
     """Helper to construct standard OPDS 1.2 XML Atom Feed documents."""
 
@@ -331,6 +339,9 @@ class OpdsBuilder:
         now = format_iso_time(story.updated_at)
         clean_title = clean_story_title(story.title)
         escaped_title = html.escape(clean_title)
+        acronym = get_story_acronym(clean_title)
+        clean_author = clean_title if (not story.author or story.author == "Đang cập nhật") else story.author
+        escaped_author = html.escape(clean_author)
         escaped_desc = html.escape(story.description or f"Tác phẩm {clean_title}")
         feed_id = f"urn:ztruyen:book:{story.source_id}:{story.slug}"
         self_url = f"{base_url}/opds/book/{story.source_id}/{story.slug}"
@@ -371,10 +382,11 @@ class OpdsBuilder:
         # 3. ĐỌC NGAY CHƯƠNG 1
         c1_url = f"{base_url}/opds/download/{story.source_id}/{story.slug}/ztruyen_{story.source_id}_{story.slug}_c0001.epub"
         entries.append(f"""    <entry>
-        <title>Chương 1</title>
+        <title>{acronym}_Chương 1</title>
         <id>urn:ztruyen:chapter:{story.source_id}:{story.slug}:c0001</id>
         <updated>{now}</updated>
-        <summary type="text">Tải nhanh chương 1 để đọc tức thì.</summary>
+        <author><name>{escaped_author}</name></author>
+        <summary type="text">{escaped_title} — Tải nhanh chương 1 để đọc tức thì.</summary>
         <link rel="http://opds-spec.org/acquisition" href="{html.escape(c1_url)}" type="application/epub+zip" title="Tải &amp; Đọc Chương 1"/>
         {cover_tags}
     </entry>""")
@@ -382,10 +394,11 @@ class OpdsBuilder:
         # 4. TẢI TRỌN BỘ (ALL CHƯƠNG)
         all_url = f"{base_url}/opds/download/{story.source_id}/{story.slug}/ztruyen_{story.source_id}_{story.slug}_all.epub"
         entries.append(f"""    <entry>
-        <title>Trọn Bộ ({total_ch} Chương)</title>
+        <title>{acronym}_Trọn Bộ_chương 1-{total_ch}</title>
         <id>urn:ztruyen:volume:{story.source_id}:{story.slug}:all</id>
         <updated>{now}</updated>
-        <summary type="text">Tải toàn bộ {total_ch} chương thành 1 file EPUB hoàn chỉnh để lưu offline.</summary>
+        <author><name>{escaped_author}</name></author>
+        <summary type="text">{escaped_title} — Tải toàn bộ {total_ch} chương thành 1 file EPUB hoàn chỉnh để lưu offline.</summary>
         <link rel="http://opds-spec.org/acquisition" href="{html.escape(all_url)}" type="application/epub+zip" title="Tải Trọn Bộ ({total_ch} Chương)"/>
         {cover_tags}
     </entry>""")
@@ -395,7 +408,7 @@ class OpdsBuilder:
             vol_idx = s["vol_index"]
             start_ch = s["start_order"]
             end_ch = s["end_order"]
-            vol_title = f"Tập {vol_idx:02d} (Chương {start_ch}-{end_ch})"
+            vol_title = f"{acronym}_Tập {vol_idx:02d}_chương {start_ch}-{end_ch}"
             vol_filename = f"ztruyen_{story.source_id}_{story.slug}_v{vol_idx:02d}.epub"
             download_url = f"{base_url}/opds/download/{story.source_id}/{story.slug}/{vol_filename}"
             vol_id = f"urn:ztruyen:volume:{story.source_id}:{story.slug}:v{vol_idx:02d}"
@@ -404,7 +417,8 @@ class OpdsBuilder:
         <title>{html.escape(vol_title)}</title>
         <id>{vol_id}</id>
         <updated>{now}</updated>
-        <summary type="text">Bao gồm {s['count']} chương ({start_ch} đến {end_ch}). Chuẩn hóa KOSync cho Xteink X3.</summary>
+        <author><name>{escaped_author}</name></author>
+        <summary type="text">{escaped_title} — Bao gồm {s['count']} chương ({start_ch} đến {end_ch}). Chuẩn hóa KOSync cho Xteink X3.</summary>
         <link rel="http://opds-spec.org/acquisition"
               href="{html.escape(download_url)}"
               type="application/epub+zip"
@@ -535,14 +549,17 @@ class OpdsBuilder:
     ) -> str:
         """Construct Story Detail Feed listing individual chapters.
         Layout:
-          Title: Chương {order}_{tên chương}
-          Author: Omitted to prevent CrossVi from appending ' - author' suffix to every line.
+          Title (Row 1): {Acronym}_Chương X
+          Author (Row 2): Tên Truyện
         """
         now = format_iso_time(story.updated_at)
         clean_title = clean_story_title(story.title)
         escaped_title = html.escape(clean_title)
+        acronym = get_story_acronym(clean_title)
+        clean_author = clean_title if (not story.author or story.author == "Đang cập nhật") else story.author
+        escaped_author = html.escape(clean_author)
         escaped_desc = html.escape(story.description or f"Tác phẩm {clean_title}")
-        
+
         feed_id_suffix = f":{range_label}" if range_label else f":{sort_order}"
         feed_id = f"urn:ztruyen:book:{story.source_id}:{story.slug}:chapters{feed_id_suffix}"
         if not self_url:
@@ -562,14 +579,17 @@ class OpdsBuilder:
             raw_title = getattr(c, "title", f"Chương {order}")
             formatted_title = format_chapter_title(order, raw_title, story.title)
 
+            display_chap_title = f"{acronym}_Chương {order}"
+
             chap_filename = f"ztruyen_{story.source_id}_{story.slug}_c{order:04d}.epub"
             download_url = f"{base_url}/opds/download/{story.source_id}/{story.slug}/{chap_filename}"
             chap_id = f"urn:ztruyen:chapter:{story.source_id}:{story.slug}:c{order:04d}"
 
             entry = f"""    <entry>
-        <title>{html.escape(formatted_title)}</title>
+        <title>{html.escape(display_chap_title)}</title>
         <id>{chap_id}</id>
         <updated>{now}</updated>
+        <author><name>{escaped_author}</name></author>
         <summary type="text">{html.escape(formatted_title)}</summary>
         <link rel="http://opds-spec.org/acquisition"
               href="{html.escape(download_url)}"

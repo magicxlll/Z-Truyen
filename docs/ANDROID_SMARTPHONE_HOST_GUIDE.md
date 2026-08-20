@@ -74,5 +74,5 @@ Sau khi tải xong sách về máy X3, trên màn hình Termux bạn chỉ cần
    - Vào *Cài đặt điện thoại* $\rightarrow$ *Ứng dụng* $\rightarrow$ *Termux* $\rightarrow$ *Pin* $\rightarrow$ Chọn **Không giới hạn (Unrestricted)**.
    - Mở màn hình đa nhiệm $\rightarrow$ Giữ cửa sổ Termux $\rightarrow$ Bấm **Ổ Khóa 🔒** để khóa ứng dụng.
 2. **X3 không tìm thấy tên miền `ztruyen.local`**:
-   - Nếu router Wi-Fi chặn mDNS broadcast, bạn hãy nhập trực tiếp địa chỉ IP hiển thị trên màn hình Termux (ví dụ `http://192.168.1.22:8080/opds`).
+   - Nếu router Wi-Fi chặn mDNS broadcast, bạn hãy nhập trực tiếp địa chỉ IP hiển thị trên màn hình Termux (ví dụ `http://10.168.133.80:8080/opds`).
    - Nếu bạn phát Hotspot từ điện thoại, địa chỉ luôn luôn cố định là `http://192.168.43.1:8080/opds` (đảm bảo 100% kết nối thành công).

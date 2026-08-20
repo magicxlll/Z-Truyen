@@ -93,20 +93,44 @@ cat > fs_/.crosspoint/opds.json << OPDS_EOF
 {
   "servers": [
     {
-      "name": "Z-Truyen (Localhost)",
+      "name": "1. Android Wi-Fi (192.168.1.15)",
+      "url": "http://192.168.1.15:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "2. Android Wi-Fi (192.168.1.16)",
+      "url": "http://192.168.1.16:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "3. Android Hotspot (192.168.43.1)",
+      "url": "http://192.168.43.1:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "4. mDNS Auto (ztruyen.local)",
+      "url": "http://ztruyen.local:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "5. Android Wi-Fi (10.168.133.80)",
+      "url": "http://10.168.133.80:8080/opds",
+      "username": "",
+      "password_obf": ""
+    },
+    {
+      "name": "6. PC Localhost (127.0.0.1)",
       "url": "http://127.0.0.1:8080/opds",
       "username": "",
       "password_obf": ""
     },
     {
-      "name": "Z-Truyen (WSL Gateway)",
+      "name": "7. PC WSL Gateway",
       "url": "http://${HOST_IP}:8080/opds",
-      "username": "",
-      "password_obf": ""
-    },
-    {
-      "name": "Z-Truyen (Android Hotspot)",
-      "url": "http://192.168.43.1:8080/opds",
       "username": "",
       "password_obf": ""
     }
@@ -124,7 +148,11 @@ echo "     - Enter / Space: Select / Open Book"
 echo "     - ESC / Backspace: Back"
 echo "     - Left Click: Touch / Swipe"
 echo "     - P key: Power / Sleep"
-echo " [!] OPDS Server: http://127.0.0.1:8080/opds"
+echo " [!] Kết nối Termux Android:"
+echo "     - http://192.168.1.15:8080/opds (Wi-Fi hiện tại)"
+echo "     - http://192.168.1.16:8080/opds (Wi-Fi hiện tại)"
+echo "     - http://192.168.43.1:8080/opds (Hotspot)"
+echo "     - http://ztruyen.local:8080/opds (mDNS Zeroconf)"
 echo "======================================================"
 echo ""
 

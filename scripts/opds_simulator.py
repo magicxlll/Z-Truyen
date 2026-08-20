@@ -384,9 +384,10 @@ def main():
     target_url = args.url.strip()
     if not target_url:
         print("\n🌐 CẤU HÌNH KẾT NỐI MÁY CHỦ:")
-        print("   - Nếu Server đang chạy trên Điện thoại phát Hotspot: Nhập http://192.168.43.1:8080")
-        print("   - Nếu Server đang chạy trên Điện thoại cùng Wi-Fi: Nhập IP điện thoại (VD: http://192.168.1.5:8080)")
-        print("   - Nếu chạy Backend ngay trên máy tính: Bấm ENTER để dùng mặc định [http://localhost:8080]")
+        print("   - 🏠 1. Điện thoại cùng Wi-Fi: http://192.168.1.15:8080 (hoặc http://192.168.1.16:8080)")
+        print("   - 📶 2. Điện thoại phát Hotspot: http://192.168.43.1:8080")
+        print("   - 🌐 3. Tự động nhận diện (mDNS): http://ztruyen.local:8080")
+        print("   - 💻 4. Chạy Backend trên máy tính: Bấm ENTER để dùng mặc định [http://localhost:8080]")
         print("-" * 65)
         user_in = input("\n👉 Nhập URL Server (bấm Enter để dùng http://localhost:8080): ").strip()
         target_url = user_in if user_in else "http://localhost:8080"

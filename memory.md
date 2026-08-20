@@ -3,13 +3,18 @@
 **Dự án**: Z-Truyen X3 (Vietnamese Story Backend & OPDS Integration for Xteink X3 & Android Pocket Host)  
 **Nhánh hoạt động**: `main` (Chuẩn hóa toàn diện, sạch sẽ trên GitHub)  
 **GitHub Repository**: [https://github.com/magicxlll/Z-Truyen.git](https://github.com/magicxlll/Z-Truyen.git)  
+<<<<<<< HEAD
 **Bản sao lưu an toàn**: `Z-Truyen_backup_20260819_212332.zip`  
+=======
+**Bản sao lưu an toàn**: `Z-Truyen_backup_20260819_212332.zip` (5.40 MB)  
+>>>>>>> 613c900 (fix(opds, cover, storage): standardize file naming with acronyms, story subfolder downloads, and restore high quality cover art)
 **Ngày cập nhật**: 2026-08-20  
 
 ---
 
 ## 🚀 1. TỔNG QUAN VÀ TRẠNG THÁI HIỆN TẠI (CURRENT PROJECT STATE)
 
+<<<<<<< HEAD
 1. **Kiểm thử toàn diện**: **36/36 test cases PASS 100%** (`backend/.venv/bin/pytest backend/tests -v`).
 2. **Giao diện OPDS 1.2 RFC Chuẩn hóa cho Màn hình E-ink (Stock Firmware X3)**:
    - **Root Catalog (`/opds`)**: Hiển thị trực tiếp các kho truyện chính (`Storya.click`, `AkayTruyen`, `Con Đường Bá Chủ`), các danh mục tổng hợp (`Truyện Mới Cập Nhật`, `Truyện Hot`, `Truyện Hoàn Thành`, `Thể Loại`), tính năng `Tìm Kiếm Truyện` (hỗ trợ bàn phím ảo của X3), và mục `Đọc Tiếp` thông minh.
@@ -22,9 +27,12 @@
    - Chi tiết truyện cung cấp đa dạng tùy chọn tải: Đọc Chương 1, Tải trọn bộ (ALL), và các tập gom sẵn (`Tập 01 (Chương 1-50)`, `Tập 02 (Chương 51-100)`...).
 5. **Định Dạng EPUB & Quản Lý Thư Mục SD Card**:
    - File EPUB sinh ra chứa đầy đủ trang bìa `cover_page.xhtml` và metadata `cover-image` giúp X3 trích xuất cover thumbnail hiển thị trên màn hình Sleep/Home.
+   - File EPUB sinh ra chứa đầy đủ trang bìa `cover_page.xhtml` và metadata `cover-image` giúp X3 trích xuất cover thumbnail hiển thị trên màn hình Sleep/Home.
    - File tải về tự động được phân loại theo thư mục tên truyện: `/books/{Tên Truyện}/{Tên File}.epub`.
+   - **Cú pháp tên file**: `{Tên truyện viết tắt}_{Tập truyện}_{Chương truyện}` (Ví dụ: `MTK_Tập 01_chương 1-50.epub`, `MTK_Chương 1.epub`, `MTK_Trọn Bộ_chương 1-3871.epub`).
 6. **Môi Trường Vận Hành Đa Nền Tảng**:
    - Chạy nền 24/7 trên điện thoại Android Termux với lệnh 1-Click `ztruyen` / `ztruyen-update`.
+   - Máy ảo Windows WSL2 / WSLg kích hoạt qua `run_crosspoint_x3.bat`.
    - Máy ảo macOS kích hoạt 1-Click qua `run_crossvi_x3.command`.
 
 ---
@@ -113,5 +121,21 @@ Z-Truyen/
 2. Nhập địa chỉ: `http://ztruyen.local:8080/opds` (hoặc IP hiển thị trên màn hình Termux, ví dụ `http://192.168.1.15:8080/opds`).
 3. Duyệt truyện và bấm **Tải về** để đọc mượt mà offline.
 
-### C. Dành cho máy ảo Simulator (macOS)
-- Chạy phím tắt 1-click [run_crossvi_x3.command](file:///Users/vietph/Library/CloudStorage/GoogleDrive-vietph.eng@gmail.com/Other%20computers/My%20Computer/DATA/Antigravity/Z-Truyen/Z-Truyen/run_crossvi_x3.command).
+### C. Dành cho máy ảo Simulator
+- **Windows (WSL2/WSLg)**: Chạy phím tắt `run_crosspoint_x3.bat`.
+- **macOS**: Chạy phím tắt 1-click `run_crossvi_x3.command`.
+
+---
+
+## 🎯 6. NHIỆM VỤ TRỌNG TÂM CHO PHIÊN TIẾP THEO (NEXT SESSION FOCUS)
+
+1. **Kiểm thử thực tế trên máy đọc sách Xteink X3 vật lý**:
+   - Bật Hotspot trên điện thoại Android (IP: `192.168.43.1:8080/opds`) hoặc kết nối chung mạng Wi-Fi (`192.168.1.15:8080/opds`).
+   - Mở OPDS Browser trên X3 thật, duyệt các mục: Đọc tiếp, Chọn nguồn, Mới cập nhật, Tải chương.
+   - Kiểm tra độ sắc nét và tốc độ tải thực tế trên màn hình e-ink thật.
+2. **Nâng cấp gói cài đặt APK 1-Click (Roadmap Cấp 2)**:
+   - Nghiên cứu đóng gói Backend thành file `.apk` độc lập (sử dụng Termux:GUI wrapper hoặc Kivy/Python-for-Android) để người dùng chỉ cần nhấn 1 nút là mở server.
+3. **Quy trình làm việc chuẩn cho Agent tiếp theo**:
+   - Trước khi commit: Chạy `python -m pytest backend/tests -v` (đảm bảo 33/33 tests PASS).
+   - Commit và push lên `origin main`.
+   - Hướng dẫn người dùng cập nhật trên điện thoại Termux bằng lệnh: `ztruyen-update`.
