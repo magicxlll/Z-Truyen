@@ -33,10 +33,46 @@ mkdir -p "$PROJECT_ROOT/backend/data/cache/epubs" 2>/dev/null || true
 mkdir -p "$PROJECT_ROOT/backend/data/cache/covers" 2>/dev/null || true
 chmod -R u+rwx "$PROJECT_ROOT/backend/data" 2>/dev/null || true
 
-# Tự động giải phóng cổng 8080 nếu có tiến trình server cũ chạy ngầm
-pkill -f "uvicorn.*app.main:app" 2>/dev/null || true
-pkill -f "python.*app.main" 2>/dev/null || true
-sleep 0.3
+# Tự động giải phóng cổng 8080 triệt để (quét socket inode qua procfs + SIGKILL)
+python3 -c "
+import os, signal
+
+def kill_process_on_port(port=8080):
+    hex_port = f':{port:04X}'
+    inodes = set()
+    for net_file in ['/proc/net/tcp', '/proc/net/tcp6']:
+        try:
+            with open(net_file, 'r') as f:
+                for line in f.readlines()[1:]:
+                    parts = line.strip().split()
+                    if len(parts) >= 10 and parts[1].endswith(hex_port):
+                        inodes.add(parts[9])
+        except Exception:
+            pass
+
+    if inodes:
+        my_pid = os.getpid()
+        for pid_str in os.listdir('/proc'):
+            if pid_str.isdigit() and int(pid_str) != my_pid:
+                pid = int(pid_str)
+                fd_dir = f'/proc/{pid}/fd'
+                try:
+                    for fd in os.listdir(fd_dir):
+                        try:
+                            target = os.readlink(f'{fd_dir}/{fd}')
+                            if any(f'[{inode}]' in target for inode in inodes):
+                                os.kill(pid, signal.SIGKILL)
+                                break
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+kill_process_on_port(8080)
+" 2>/dev/null || true
+pkill -9 -f "uvicorn.*app.main:app" 2>/dev/null || true
+pkill -9 -f "python.*app.main" 2>/dev/null || true
+sleep 0.5
 
 # Phân loại và lấy danh sách IP mạng nội bộ thông minh
 NET_INFO=$(python3 -c "
