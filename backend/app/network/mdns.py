@@ -34,9 +34,9 @@ def get_local_ip_addresses() -> list[str]:
                 ip = parts[3].split('/')[0]
                 if ip.startswith('127.') or any(c in ifname for c in cellular_keywords):
                     continue
-                if any(h in ifname for h in ['ap', 'softap', 'swlan', 'wlan1', 'rndis', 'tether']) or ip.startswith('192.168.43.'):
+                if any(h in ifname for h in ['ap', 'softap', 'swlan', 'wlan1', 'wlan2', 'rndis', 'tether']) or ip.startswith('192.168.43.'):
                     hotspot_ips.append(ip)
-                elif any(w in ifname for w in ['wlan0', 'eth', 'en', 'wlan', 'wl']):
+                elif any(w in ifname for w in ['wlan0', 'wlan', 'eth', 'en', 'wl']):
                     wifi_ips.append(ip)
                 elif ip.startswith('192.168.') or ip.startswith('172.'):
                     wifi_ips.append(ip)

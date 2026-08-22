@@ -124,17 +124,20 @@ cellular_keywords = ['rmnet', 'ccmni', 'pdp', 'dummy', 'tun', 'tap', 'v4-', 'rad
 
 for ifname, ip in interfaces:
     ifn_lower = ifname.lower()
-    # 1. Mạng di động (4G/5G Cellular): IP dạng 10.x.x.x, 100.x.x.x hoặc card mạng di động
-    if ip.startswith('10.') or ip.startswith('100.') or any(c in ifn_lower for c in cellular_keywords):
+    # 1. Interface mạng di động cellular thuần túy
+    if any(c in ifn_lower for c in cellular_keywords):
         cell_ips.append((ifname, ip))
-    # 2. Hotspot (Điểm phát sóng): card ap, softap, swlan, wlan1 hoặc dải 192.168.43.x / 192.168.50.x
-    elif any(h in ifn_lower for h in ['ap', 'softap', 'swlan', 'wlan1', 'rndis', 'tether']) or ip.startswith('192.168.43.') or ip.startswith('192.168.50.'):
+    # 2. Hotspot / SoftAP: ap, softap, swlan, wlan1, wlan2, rndis, tether hoặc dải 192.168.43.x / 192.168.50.x
+    elif any(h in ifn_lower for h in ['ap', 'softap', 'swlan', 'wlan1', 'wlan2', 'rndis', 'tether']) or ip.startswith('192.168.43.') or ip.startswith('192.168.50.'):
         hotspot_ips.append((ifname, ip))
-    # 3. Wi-Fi gia đình (LAN)
+    # 3. Wi-Fi / LAN nội bộ: wlan0, eth, en
+    elif any(w in ifn_lower for w in ['wlan0', 'eth', 'en', 'wlan', 'wl']):
+        # Nếu không có Wi-Fi router (tắt Wi-Fi) thì wlan0 đóng vai trò Hotspot
+        hotspot_ips.append((ifname, ip))
     elif ip.startswith('192.168.') or ip.startswith('172.'):
         wifi_ips.append((ifname, ip))
     else:
-        cell_ips.append((ifname, ip))
+        hotspot_ips.append((ifname, ip))
 
 # Tự động dò tìm qua bảng ARP nếu X3 đã kết nối Hotspot
 try:
