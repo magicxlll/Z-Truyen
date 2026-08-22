@@ -57,6 +57,7 @@
 | **9** | **Tương Thích Bộ Font Màn Hình E-ink (Tránh Ký Tự Lạ / Emoji)** | Bộ font tích hợp sẵn trên firmware X3 không chứa các ký tự unicode đặc biệt như `⚡`, `➔`, `📖`, `📦`, khiến màn hình hiển thị thành các hình thoi đen chấm hỏi ``. Luôn dùng ký tự ASCII hoặc tiếng Việt chuẩn (`->`, `Chương 1`, `Tập 01...`). |
 | **10** | **Tối Ưu Tốc Độ Phản Hồi Với FastCache (< 5ms)** | Khi người dùng thao tác bấm Back hoặc chuyển đổi qua lại giữa các menu, nếu phải cào web lại sẽ mất 3-4s. Bộ nhớ đệm RAM TTL `FastCache` lưu trữ tạm thời metadata và danh mục giúp tốc độ phản hồi đạt mức tức thì (< 5ms). |
 | **11** | **Quản Lý Tiến Trình Nền Android (Termux Pocket Host)** | Hệ điều hành Android tự động đóng băng (freeze) CPU khi tắt màn hình. Trên Termux, bắt buộc phải kích hoạt `Acquire wakelock` và tắt tối ưu hóa pin (`Unrestricted Battery`) để Pocket Server duy trì kết nối cho máy X3 đọc truyện xuyên suốt. |
+| **12** | **Cấu Hình Wi-Fi Hotspot 2.4 GHz & WPA2 Cho Xteink X3** | Chip Wi-Fi ESP32 của X3 chỉ hỗ trợ băng tần 2.4 GHz (không hỗ trợ 5.0 GHz) và tương thích tốt nhất với WPA2-Personal (WPA2-PSK). Khi phát Hotspot từ điện thoại, bắt buộc đặt AP Band = 2.4 GHz, Bảo mật = WPA2-Personal, tắt VPN/AdGuard, và nhập trực tiếp địa chỉ IP (vì Android Hotspot chặn Multicast mDNS). |
 
 ---
 
@@ -77,6 +78,7 @@
 | **BUG-011** | Lỗi tràn số nguyên 64-bit trong `HttpDownloader.cpp` trên macOS | Ép kiểu `size_t` 64-bit sang `int64_t` biến thành `-1`, khiến mọi request HTTP bị hủy. | Viết `patch_crossvi.py` sửa điều kiện kiểm tra kích thước `contentLength > 0 && static_cast<uint64_t>(contentLength) > sink.maxBytes`. |
 | **BUG-012** | Lỗi mất ảnh bìa & metadata nguồn AkayTruyen | Scraper cũ chỉ tìm thẻ `h1` và `.story-thumb`, không lấy được OpenGraph `<meta>` và `.book-3d img`. | Nâng cấp scraper AkayTruyen bóc tách đa tầng OpenGraph/DOM, nâng cấp `cover_service` tự động thay thế placeholder. |
 | **BUG-013** | File tải về lưu vào thư mục tên Tác Giả thay vì Tên Truyện | Firmware X3 tạo thư mục theo thẻ `<author><name>` trong OPDS feed tải sách. | Đổi thẻ `<author><name>` trong `build_book_volumes_feed` và `build_book_chapters_feed` thành tên truyện (`story.title`). |
+| **BUG-014** | X3 báo lỗi kết nối khi bắt Wi-Fi Hotspot từ điện thoại | Hotspot phát băng tần 5.0 GHz (ESP32 chỉ hỗ trợ 2.4 GHz), WPA3-SAE gây lỗi bắt tay, hoặc nhập `ztruyen.local` bị Android chặn mDNS. | Đổi Hotspot sang 2.4 GHz, WPA2-Personal, tắt VPN, nhập trực tiếp IP Gateway hiển thị trên Termux. |
 | **FEAT-001** | Menu chính rườm rà & không gõ được tiếng Việt không dấu | Menu cũ hiển thị lẫn lộn các kho nguồn và danh mục; bàn phím X3 không có bộ gõ tiếng Việt. | Tái cấu trúc Menu chính 8 mục tinh gọn theo nguồn hiện tại, lưu `active_source` trong SQLite, tích hợp `remove_accents` cho tìm kiếm. |
 
 ---

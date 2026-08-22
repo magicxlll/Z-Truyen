@@ -73,6 +73,12 @@ Sau khi tải xong sách về máy X3, trên màn hình Termux bạn chỉ cần
    - **Kéo thanh thông báo Android từ đỉnh màn hình xuống** $\rightarrow$ Tìm thông báo của Termux $\rightarrow$ Bấm vào nút **`Acquire wakelock`** (thông báo chuyển sang `Termux: (wake lock held)`).
    - Vào *Cài đặt điện thoại* $\rightarrow$ *Ứng dụng* $\rightarrow$ *Termux* $\rightarrow$ *Pin* $\rightarrow$ Chọn **Không giới hạn (Unrestricted)**.
    - Mở màn hình đa nhiệm $\rightarrow$ Giữ cửa sổ Termux $\rightarrow$ Bấm **Ổ Khóa 🔒** để khóa ứng dụng.
-2. **X3 không tìm thấy tên miền `ztruyen.local`**:
-   - Nếu router Wi-Fi chặn mDNS broadcast, bạn hãy nhập trực tiếp địa chỉ IP hiển thị trên màn hình Termux (ví dụ `http://10.168.133.80:8080/opds`).
-   - Nếu bạn phát Hotspot từ điện thoại, địa chỉ luôn luôn cố định là `http://192.168.43.1:8080/opds` (đảm bảo 100% kết nối thành công).
+2. **X3 không kết nối được khi dùng Hotspot (Điện thoại phát Wi-Fi)**:
+   - **Băng tần 2.4 GHz (Bắt buộc)**: Chip Wi-Fi ESP32 trên X3 **chỉ hỗ trợ 2.4 GHz**, không hỗ trợ 5.0 GHz. Vào *Cài đặt Hotspot trên điện thoại* $\rightarrow$ *Băng tần AP* $\rightarrow$ Chọn **2.4 GHz** (Tắt tùy chọn Wi-Fi 6).
+   - **Bảo mật WPA2**: Vào cài đặt Hotspot $\rightarrow$ *Bảo mật* $\rightarrow$ Chọn **WPA2-Personal** (tránh chọn WPA3 hoặc WPA3-SAE khiến ESP32 lỗi bắt tay).
+   - **Địa chỉ OPDS khi dùng Hotspot**: Android chặn gói tin mDNS qua Hotspot nên **không thể dùng `ztruyen.local`**. Bạn phải nhập trực tiếp IP hiển thị tại mục `[CHẾ ĐỘ HOTSPOT DI ĐỘNG]` trong Termux (ví dụ: `http://192.168.43.1:8080/opds` hoặc IP Gateway cấp cho X3).
+   - **Tắt VPN / AdGuard**: Tắt các app 1.1.1.1 WARP, AdGuard, VPN trên điện thoại vì chúng có thể chặn cổng 8080 từ Hotspot.
+   - **Thứ tự bật**: Bật 4G & Hotspot **trước**, sau đó mới mở Termux gõ `ztruyen`.
+
+3. **X3 không tìm thấy tên miền `ztruyen.local` khi dùng Wi-Fi gia đình (LAN)**:
+   - Nếu router Wi-Fi chặn mDNS broadcast, hãy nhập trực tiếp địa chỉ IP hiển thị tại mục `[CHẾ ĐỘ WI-FI GIA ĐÌNH]` trên màn hình Termux (ví dụ `http://192.168.1.15:8080/opds`).

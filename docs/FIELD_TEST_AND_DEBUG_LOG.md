@@ -19,6 +19,8 @@
 | **BUG-009** | Storya Scraper / Layout | Lỗi thiếu `import asyncio` và tràn tiêu đề chương X3 | ✅ Đã khắc phục | 2026-08-19 |
 | **BUG-011** | 64-bit Simulator | Lỗi ép kiểu `size_t::max() -> int64_t = -1` gây `exceeds size limit` | ✅ Đã khắc phục | 2026-08-19 |
 | **BUG-012** | AkayTruyen Scraper | Lỗi thiếu ảnh bìa và metadata truyện từ nguồn AkayTruyen | ✅ Đã khắc phục | 2026-08-20 |
+| **BUG-013** | Storage Path / Author | File tải về lưu vào thư mục Tác giả thay vì Tên truyện | ✅ Đã khắc phục | 2026-08-20 |
+| **BUG-014** | Hotspot Connectivity | X3 báo lỗi kết nối khi bắt Wi-Fi Hotspot phát từ điện thoại Android | ✅ Đã khắc phục | 2026-08-22 |
 | **DEPLOY-001** | Môi trường Android | Cài đặt toàn bộ 26 packages (FastAPI, EbookLib, Zeroconf...) | 🟢 Hoàn tất 100% | 2026-08-19 |
 | **RULE-001** | Firmware Integrity | Tuyệt đối tuân thủ 100% Stock Factory Firmware của Xteink X3 | 🟢 Tuân thủ 100% | 2026-08-19 |
 
@@ -253,7 +255,23 @@
      - Chuẩn hóa Unicode loại bỏ dấu tiếng Việt, so khớp đa nhánh (direct search, slug search, và unaccented title scoring).
      - Cho phép gõ `muc than ky`, `thien la`, `con duong ba chu` tìm ra đúng tác phẩm ngay lập tức.
 
-### 17. RULE-001: Nguyên Tắc Bất Di Bất Dịch — Giữ 100% Stock Factory Firmware
+### 17. BUG-014: Lỗi Kết Nối Máy Đọc Sách X3 Khi Bắt Wi-Fi Hotspot Phát Từ Điện Thoại
+- **Môi trường**: Thiết bị thật Xteink X3 (Firmware CrossPoint 1.5) kết nối vào Điểm phát sóng di động (Hotspot) phát từ điện thoại Android.
+- **Triệu chứng**: X3 báo lỗi kết nối ("Connection failed" / "Lỗi kết nối") khi quét Wi-Fi hoặc khi nhập URL OPDS.
+- **Nguyên nhân gốc rễ (Root Cause)**:
+  1. **Băng tần Wi-Fi 5.0 GHz (ESP32 không hỗ trợ)**: Phần cứng chip Wi-Fi ESP32 trên X3 chỉ thu được sóng 2.4 GHz. Hầu hết smartphone Android đời mới mặc định phát Hotspot ở băng tần 5.0 GHz hoặc bật tính năng Wi-Fi 6.
+  2. **Chuẩn bảo mật WPA3-SAE / PMF**: Android 12+ mặc định dùng WPA3 hoặc WPA2/WPA3 hỗn hợp, khiến vi điều khiển ESP32 gặp lỗi bắt tay (handshake failure).
+  3. **mDNS bị chặn trên Hotspot Android**: Android Hotspot (Tethering netd) chặn gói tin Multicast UDP port 5353, nên X3 không thể phân giải `ztruyen.local:8080`.
+  4. **Dải IP Gateway biến đổi**: Một số dòng máy Android cấp dải IP khác (như `192.168.1.1`, `192.168.203.1`, `192.168.100.1`...) thay vì `192.168.43.1`.
+  5. **VPN / AdGuard**: App VPN hoặc bộ lọc quảng cáo cục bộ chặn cổng 8080 từ interface Hotspot.
+- **Cách khắc phục triệt để**:
+  1. **Đổi băng tần Hotspot**: Trên điện thoại, vào *Cài đặt Hotspot* $\rightarrow$ *Băng tần AP* $\rightarrow$ Chọn **2.4 GHz** (Bắt buộc). Tắt tùy chọn Wi-Fi 6 nếu có.
+  2. **Đổi chuẩn bảo mật**: Đặt bảo mật Hotspot là **WPA2-Personal** (hoặc WPA2-PSK).
+  3. **Nhập IP trực tiếp**: Khi dùng Hotspot, bắt buộc nhập URL theo IP (ví dụ `http://192.168.43.1:8080/opds` hoặc IP Gateway cấp cho X3), không dùng `ztruyen.local`.
+  4. **Tắt VPN/AdGuard**: Tắt các app 1.1.1.1 WARP, AdGuard trên điện thoại khi kết nối X3.
+  5. **Nâng cấp script `start-server.sh`**: Tự động phân loại và in ra đúng IP của Hotspot (`ap0`/`wlan1`) kèm bảng cảnh báo cấu hình trực quan.
+
+### 18. RULE-001: Nguyên Tắc Bất Di Bất Dịch — Giữ 100% Stock Factory Firmware
 - **Quy tắc**: Tuyệt đối **KHÔNG** chỉnh sửa hoặc can thiệp vào mã nguồn firmware gốc của CrossPoint Reader / Xteink X3 để đạt được mục đích.
 - **Lý do**: Máy đọc sách Xteink X3 vật lý ngoài đời chạy firmware gốc xuất xưởng của nhà sản xuất (hoặc bản flash release chính thức). Người dùng không thể và không nên tùy tiện flash custom firmware vì rủi ro brick máy cao.
 - **Giải pháp chuẩn**: Mọi tính năng (danh sách chương, tiếp tục đọc, phân loại danh mục, ảnh bìa, gom tập KOSync) phải được hiện thực hoàn toàn 100% phía **Backend Server OPDS** theo đúng đặc tả Atom / OPDS 1.2 RFC.
