@@ -33,6 +33,11 @@ mkdir -p "$PROJECT_ROOT/backend/data/cache/epubs" 2>/dev/null || true
 mkdir -p "$PROJECT_ROOT/backend/data/cache/covers" 2>/dev/null || true
 chmod -R u+rwx "$PROJECT_ROOT/backend/data" 2>/dev/null || true
 
+# Tự động giải phóng cổng 8080 nếu có tiến trình server cũ chạy ngầm
+pkill -f "uvicorn.*app.main:app" 2>/dev/null || true
+pkill -f "python.*app.main" 2>/dev/null || true
+sleep 0.3
+
 # Phân loại và lấy danh sách IP mạng nội bộ thông minh
 NET_INFO=$(python3 -c "
 import subprocess, re
@@ -79,14 +84,17 @@ interfaces = get_interfaces()
 hotspot_ips = []
 wifi_ips = []
 cell_ips = []
+cellular_keywords = ['rmnet', 'ccmni', 'pdp', 'dummy', 'tun', 'tap', 'v4-', 'radio', 'wwan', 'cellular', 'seth_w', 'ipa']
 
 for ifname, ip in interfaces:
     ifn_lower = ifname.lower()
-    if any(h in ifn_lower for h in ['ap', 'softap', 'swlan', 'wlan1', 'rndis', 'tether']) or ip.startswith('192.168.43.'):
+    if any(c in ifn_lower for c in cellular_keywords):
+        cell_ips.append((ifname, ip))
+    elif any(h in ifn_lower for h in ['ap', 'softap', 'swlan', 'wlan1', 'rndis', 'tether']) or ip.startswith('192.168.43.'):
         hotspot_ips.append((ifname, ip))
-    elif any(w in ifn_lower for w in ['wlan0', 'eth', 'en', 'wlan']):
+    elif any(w in ifn_lower for w in ['wlan0', 'eth', 'en', 'wlan', 'wl']) or ip.startswith('192.168.') or ip.startswith('172.'):
         wifi_ips.append((ifname, ip))
-    elif any(c in ifn_lower for c in ['rmnet', 'ccmni', 'pdp', 'dummy', 'tun', 'tap', 'v4-']):
+    elif ip.startswith('10.') and not any(w in ifn_lower for w in ['wlan', 'eth', 'en']):
         cell_ips.append((ifname, ip))
     else:
         wifi_ips.append((ifname, ip))
@@ -104,6 +112,7 @@ if cell_ips:
 
 HOTSPOT_LIST=$(echo "$NET_INFO" | grep '^HOTSPOT' | cut -d'|' -f3 || true)
 WIFI_LIST=$(echo "$NET_INFO" | grep '^WIFI' | cut -d'|' -f3 || true)
+CELL_LIST=$(echo "$NET_INFO" | grep '^CELL' | cut -d'|' -f3 || true)
 
 echo ""
 echo "======================================================================"
@@ -117,9 +126,10 @@ if [ -n "$HOTSPOT_LIST" ]; then
         echo "    👉 http://$ip:$PORT/opds"
     done
     echo ""
-else
+elif [ -z "$WIFI_LIST" ]; then
     echo " 📶 [CHẾ ĐỘ HOTSPOT DI ĐỘNG] (Khi ra ngoài / Điểm phát sóng di động):"
-    echo "    👉 http://192.168.43.1:$PORT/opds (hoặc IP Gateway cấp cho X3)"
+    echo "    ⚠️ Chưa bật Hotspot. Hãy bật Điểm phát sóng (2.4 GHz) trên điện thoại!"
+    echo "    👉 Địa chỉ mặc định: http://192.168.43.1:$PORT/opds (hoặc IP Gateway cấp cho X3)"
     echo ""
 fi
 
@@ -129,6 +139,11 @@ if [ -n "$WIFI_LIST" ]; then
         echo "    👉 http://$ip:$PORT/opds"
     done
     echo "    👉 http://ztruyen.local:$PORT/opds  (Tự động nhận diện mDNS)"
+    echo ""
+fi
+
+if [ -n "$CELL_LIST" ]; then
+    echo " 📡 [DỮ LIỆU DI ĐỘNG 4G/5G] Đã kết nối mạng di động (Sẵn sàng cào truyện mới)."
     echo ""
 fi
 

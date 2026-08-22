@@ -16,8 +16,9 @@ except ImportError:
 
 
 def get_local_ip_addresses() -> list[str]:
-    """Retrieve all non-loopback IPv4 addresses on local interfaces, prioritizing Hotspot and LAN over Cellular."""
+    """Retrieve non-loopback IPv4 addresses strictly for local Hotspot & LAN interfaces (excluding cellular WAN)."""
     ip_list: list[str] = []
+    cellular_keywords = ['rmnet', 'ccmni', 'pdp', 'dummy', 'tun', 'tap', 'v4-', 'radio', 'wwan', 'cellular', 'seth_w', 'ipa']
 
     # 1. Try parsing system network interfaces via 'ip -4 -o addr show' (Linux / Android Termux)
     try:
@@ -25,59 +26,42 @@ def get_local_ip_addresses() -> list[str]:
         out = subprocess.check_output(['ip', '-4', '-o', 'addr', 'show'], text=True, stderr=subprocess.DEVNULL)
         hotspot_ips: list[str] = []
         wifi_ips: list[str] = []
-        other_ips: list[str] = []
 
         for line in out.strip().split('\n'):
             parts = line.split()
             if len(parts) >= 4:
                 ifname = parts[1].lower()
                 ip = parts[3].split('/')[0]
-                if ip.startswith('127.'):
+                if ip.startswith('127.') or any(c in ifname for c in cellular_keywords):
                     continue
                 if any(h in ifname for h in ['ap', 'softap', 'swlan', 'wlan1', 'rndis', 'tether']) or ip.startswith('192.168.43.'):
                     hotspot_ips.append(ip)
-                elif any(w in ifname for w in ['wlan0', 'eth', 'en', 'wlan']):
+                elif any(w in ifname for w in ['wlan0', 'eth', 'en', 'wlan', 'wl']):
                     wifi_ips.append(ip)
-                elif not any(c in ifname for c in ['rmnet', 'ccmni', 'pdp', 'dummy', 'tun', 'tap', 'v4-']):
-                    other_ips.append(ip)
-                else:
-                    other_ips.append(ip)
+                elif ip.startswith('192.168.') or ip.startswith('172.'):
+                    wifi_ips.append(ip)
 
-        for ip in hotspot_ips + wifi_ips + other_ips:
+        for ip in hotspot_ips + wifi_ips:
             if ip not in ip_list:
                 ip_list.append(ip)
     except Exception:
         pass
 
-    # 2. Try socket route fallback
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0.5)
-        s.connect(("8.8.8.8", 80))
-        route_ip = s.getsockname()[0]
-        s.close()
-        if route_ip and not route_ip.startswith("127.") and route_ip not in ip_list:
-            ip_list.append(route_ip)
-    except Exception:
-        pass
-
-    # 3. Fallback to hostname resolution
+    # 2. Fallback to hostname resolution if no cellular
     try:
         hostname = socket.gethostname()
         for ip in socket.gethostbyname_ex(hostname)[2]:
-            if ip not in ip_list and not ip.startswith("127."):
-                ip_list.append(ip)
+            if not ip.startswith("127.") and not ip.startswith("10.") and (ip.startswith("192.168.") or ip.startswith("172.")):
+                if ip not in ip_list:
+                    ip_list.append(ip)
     except Exception:
         pass
-
-    if not ip_list:
-        ip_list.append("127.0.0.1")
 
     return ip_list
 
 
 class MdnsService:
-    """Manages mDNS advertisement lifecycle."""
+    """Manages mDNS advertisement lifecycle safely without blocking server startup."""
 
     def __init__(self, port: int = 8080, service_name: str = "ztruyen"):
         self.port = port
@@ -86,13 +70,16 @@ class MdnsService:
         self.service_info: Optional[ServiceInfo] = None
 
     def start(self) -> None:
-        """Register the mDNS service with all local IPv4 addresses."""
+        """Register the mDNS service with local IPv4 addresses (LAN / Hotspot only)."""
         if not ZEROCONF_AVAILABLE:
-            logger.warning("[mDNS] Zeroconf library not installed; skipping mDNS broadcast.")
             return
 
         try:
             local_ips = get_local_ip_addresses()
+            if not local_ips:
+                logger.info("[mDNS] No local Wi-Fi or Hotspot interface active; skipping mDNS broadcast.")
+                return
+
             ip_bytes_list = []
             for ip in local_ips:
                 try:
@@ -101,7 +88,7 @@ class MdnsService:
                     pass
 
             if not ip_bytes_list:
-                ip_bytes_list = [socket.inet_aton("127.0.0.1")]
+                return
 
             primary_ip = local_ips[0]
             server_name = f"{self.service_name}.local."
@@ -124,23 +111,23 @@ class MdnsService:
                 server=server_name,
             )
 
-            self.zeroconf = Zeroconf()
+            self.zeroconf = Zeroconf(interfaces=local_ips)
             self.zeroconf.register_service(self.service_info)
             logger.info(
                 f"[mDNS] Registered service '{server_name}:{self.port}' -> IPs {local_ips} (http://{self.service_name}.local:{self.port}/opds)"
             )
         except Exception as e:
-            logger.warning(f"[mDNS] Could not register mDNS service: {e}")
+            logger.debug(f"[mDNS] Could not register mDNS service: {e}")
 
     def stop(self) -> None:
-        """Unregister the mDNS service."""
+        """Unregister the mDNS service safely."""
         if self.zeroconf and self.service_info:
             try:
                 self.zeroconf.unregister_service(self.service_info)
                 self.zeroconf.close()
                 logger.info("[mDNS] Unregistered mDNS service.")
             except Exception as e:
-                logger.warning(f"[mDNS] Error unregistering service: {e}")
+                logger.debug(f"[mDNS] Error unregistering service: {e}")
             finally:
                 self.zeroconf = None
                 self.service_info = None
