@@ -76,7 +76,7 @@ sleep 0.5
 
 # Phân loại và lấy danh sách IP mạng nội bộ thông minh
 NET_INFO=$(python3 -c "
-import subprocess, re
+import subprocess, re, os
 
 def get_interfaces():
     results = []
@@ -124,16 +124,34 @@ cellular_keywords = ['rmnet', 'ccmni', 'pdp', 'dummy', 'tun', 'tap', 'v4-', 'rad
 
 for ifname, ip in interfaces:
     ifn_lower = ifname.lower()
-    if any(c in ifn_lower for c in cellular_keywords):
+    # 1. Mạng di động (4G/5G Cellular): IP dạng 10.x.x.x, 100.x.x.x hoặc card mạng di động
+    if ip.startswith('10.') or ip.startswith('100.') or any(c in ifn_lower for c in cellular_keywords):
         cell_ips.append((ifname, ip))
-    elif any(h in ifn_lower for h in ['ap', 'softap', 'swlan', 'wlan1', 'rndis', 'tether']) or ip.startswith('192.168.43.'):
+    # 2. Hotspot (Điểm phát sóng): card ap, softap, swlan, wlan1 hoặc dải 192.168.43.x / 192.168.50.x
+    elif any(h in ifn_lower for h in ['ap', 'softap', 'swlan', 'wlan1', 'rndis', 'tether']) or ip.startswith('192.168.43.') or ip.startswith('192.168.50.'):
         hotspot_ips.append((ifname, ip))
-    elif any(w in ifn_lower for w in ['wlan0', 'eth', 'en', 'wlan', 'wl']) or ip.startswith('192.168.') or ip.startswith('172.'):
+    # 3. Wi-Fi gia đình (LAN)
+    elif ip.startswith('192.168.') or ip.startswith('172.'):
         wifi_ips.append((ifname, ip))
-    elif ip.startswith('10.') and not any(w in ifn_lower for w in ['wlan', 'eth', 'en']):
-        cell_ips.append((ifname, ip))
     else:
-        wifi_ips.append((ifname, ip))
+        cell_ips.append((ifname, ip))
+
+# Tự động dò tìm qua bảng ARP nếu X3 đã kết nối Hotspot
+try:
+    if os.path.exists('/proc/net/arp'):
+        with open('/proc/net/arp', 'r') as f:
+            for line in f.readlines()[1:]:
+                parts = line.strip().split()
+                if len(parts) >= 6:
+                    client_ip = parts[0]
+                    dev = parts[5]
+                    if client_ip.startswith('192.168.') or client_ip.startswith('172.'):
+                        prefix = '.'.join(client_ip.split('.')[:3])
+                        gw = f'{prefix}.1'
+                        if not any(ip == gw for _, ip in hotspot_ips):
+                            hotspot_ips.append((dev, gw))
+except Exception:
+    pass
 
 if hotspot_ips:
     for ifn, ip in hotspot_ips:
@@ -163,9 +181,8 @@ if [ -n "$HOTSPOT_LIST" ]; then
     done
     echo ""
 elif [ -z "$WIFI_LIST" ]; then
-    echo " 📶 [CHẾ ĐỘ HOTSPOT DI ĐỘNG] (Khi ra ngoài / Điểm phát sóng di động):"
-    echo "    ⚠️ Chưa bật Hotspot. Hãy bật Điểm phát sóng (2.4 GHz) trên điện thoại!"
-    echo "    👉 Địa chỉ mặc định: http://192.168.43.1:$PORT/opds (hoặc IP Gateway cấp cho X3)"
+    echo " 📶 [CHẾ ĐỘ HOTSPOT DI ĐỘNG] (Khi ra ngoài / Tắt Wi-Fi dùng 5G Hotspot):"
+    echo "    👉 http://192.168.43.1:$PORT/opds (hoặc IP Gateway cấp cho X3)"
     echo ""
 fi
 
@@ -179,7 +196,7 @@ if [ -n "$WIFI_LIST" ]; then
 fi
 
 if [ -n "$CELL_LIST" ]; then
-    echo " 📡 [DỮ LIỆU DI ĐỘNG 4G/5G] Đã kết nối mạng di động (Sẵn sàng cào truyện mới)."
+    echo " 📡 [DỮ LIỆU DI ĐỘNG 4G/5G] Đã kết nối mạng 5G (Sẵn sàng cào truyện mới)."
     echo ""
 fi
 
