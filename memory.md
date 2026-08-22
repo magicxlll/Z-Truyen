@@ -3,8 +3,8 @@
 **Dự án**: Z-Truyen X3 (Vietnamese Story Backend & OPDS Integration for Xteink X3 & Android Pocket Host)  
 **Nhánh hoạt động**: `main` (Chuẩn hóa toàn diện, sạch sẽ trên GitHub)  
 **GitHub Repository**: [https://github.com/magicxlll/Z-Truyen.git](https://github.com/magicxlll/Z-Truyen.git)  
-**Bản sao lưu an toàn**: `Z-Truyen_backup_20260820_174500.zip`  
-**Ngày cập nhật**: 2026-08-20  
+**Ngày cập nhật**: 2026-08-22  
+**Trạng thái kiểm thử thực tế**: 🟢 **ĐÃ XÁC THỰC THÀNH CÔNG 100% TRÊN MÁY THẬT XTEINK X3 (CROSSPOINT 1.6-RC) QUA 5G HOTSPOT DI ĐỘNG & WI-FI LAN**.
 
 ---
 
@@ -28,7 +28,7 @@
    - Chi tiết truyện cung cấp đa dạng tùy chọn tải: Đọc từng chương lẻ (streaming 0.3s), Tải trọn bộ (ALL), và các tập gom sẵn (`Tập 01 (Chương 1-50)`, `Tập 02 (Chương 51-100)`...).
 5. **Cấu Trúc Lưu Trữ SDCard & Đặt Tên File Tự Động**:
    - **Thư mục lưu trữ**: Tự động tạo thư mục con theo tên truyện trên thẻ nhớ: `SDCard/Books/{Tên Truyện}/{Tên File}.epub`.
-   - **Cú pháp tên file**: `{Tên viết tắt}_{Tập truyện}_{Chương truyện}.epub` (Ví dụ: `TL_Tập 01_chương 1-50.epub`, `MTK_Tập 01_chương 1-50.epub`, `MTK_Chương 1.epub`).
+   - **Cú pháp tên file**: `{Tên viết tắt}_{Tập truyện}_{Chương truyện}.epub` (Ví dụ: `LHTNQ_Trọn Bộ_chương 1-54.epub`, `NTCTCL_Trọn Bộ_chương 1-35.epub`, `STNT_Trọn Bộ_chương 1-51.epub`).
 6. **Xử Lý Ảnh Bìa (Cover Art) Sắc Nét Cho E-ink**:
    - Bộ cào dữ liệu tự động bóc tách ảnh bìa đa tầng: OpenGraph `<meta property="og:image">` và DOM `.book-3d img`.
    - Tự động chuyển đổi ảnh PNG/WebP sang JPEG 16-level grayscale kích thước chuẩn E-ink.
@@ -36,7 +36,7 @@
 7. **Tốc độ phản hồi tức thì (Fast In-Memory TTL Cache)**:
    - Phản hồi khi lật trang, duyệt danh mục hoặc bấm nút **Back** đạt tốc độ **< 5ms**.
 8. **Môi Trường Vận Hành Đa Nền Tảng**:
-   - Chạy nền 24/7 trên điện thoại Android Termux với lệnh 1-Click `ztruyen` / `ztruyen-update`.
+   - Chạy nền 24/7 trên điện thoại Android Termux với lệnh 1-Click `ztruyen` / `ztruyen-update` / `ztruyen-debug` / `ztruyen-monitor`.
    - Máy ảo Windows WSL2 / WSLg kích hoạt qua `run_crosspoint_x3.bat`.
    - Máy ảo macOS kích hoạt 1-Click qua `run_crossvi_x3.command`.
 
@@ -57,7 +57,9 @@
 | **9** | **Tương Thích Bộ Font Màn Hình E-ink (Tránh Ký Tự Lạ / Emoji)** | Bộ font tích hợp sẵn trên firmware X3 không chứa các ký tự unicode đặc biệt như `⚡`, `➔`, `📖`, `📦`, khiến màn hình hiển thị thành các hình thoi đen chấm hỏi ``. Luôn dùng ký tự ASCII hoặc tiếng Việt chuẩn (`->`, `Chương 1`, `Tập 01...`). |
 | **10** | **Tối Ưu Tốc Độ Phản Hồi Với FastCache (< 5ms)** | Khi người dùng thao tác bấm Back hoặc chuyển đổi qua lại giữa các menu, nếu phải cào web lại sẽ mất 3-4s. Bộ nhớ đệm RAM TTL `FastCache` lưu trữ tạm thời metadata và danh mục giúp tốc độ phản hồi đạt mức tức thì (< 5ms). |
 | **11** | **Quản Lý Tiến Trình Nền Android (Termux Pocket Host)** | Hệ điều hành Android tự động đóng băng (freeze) CPU khi tắt màn hình. Trên Termux, bắt buộc phải kích hoạt `Acquire wakelock` và tắt tối ưu hóa pin (`Unrestricted Battery`) để Pocket Server duy trì kết nối cho máy X3 đọc truyện xuyên suốt. |
-| **12** | **Cấu Hình Wi-Fi Hotspot 2.4 GHz & WPA2 Cho Xteink X3** | Chip Wi-Fi ESP32 của X3 chỉ hỗ trợ băng tần 2.4 GHz (không hỗ trợ 5.0 GHz) và tương thích tốt nhất với WPA2-Personal (WPA2-PSK). Khi phát Hotspot từ điện thoại, bắt buộc đặt AP Band = 2.4 GHz, Bảo mật = WPA2-Personal, tắt VPN/AdGuard, và nhập trực tiếp địa chỉ IP (vì Android Hotspot chặn Multicast mDNS). |
+| **12** | **Cấu Hình Wi-Fi Hotspot 2.4 GHz & WPA2 Cho Xteink X3** | Chip Wi-Fi ESP32 của X3 chỉ hỗ trợ băng tần 2.4 GHz (không hỗ trợ 5.0 GHz) và tương thích tốt nhất với WPA2-Personal (WPA2-PSK). Khi phát Hotspot từ điện thoại, bắt buộc đặt AP Band = 2.4 GHz, Bảo mật = WPA2-Personal, tắt Wi-Fi 6, tắt PMF, và tắt VPN/AdGuard. |
+| **13** | **Dải IP Hotspot Động Của Android (OEM Subnets: `10.x.x.x` trên `wlan2`)** | Nhiều smartphone 5G đời mới (Oppo, Realme, Vivo) không dùng `192.168.43.1` mà gán IP động như `10.59.53.37` cho Hotspot interface `wlan2`. Backend phải phân loại chính xác các card `wlan*`, `ap*`, `softap*` để in ra đúng IP Gateway thực tế cho người dùng nhập trên máy X3. |
+| **14** | **Giải Phóng Port 8080 Cưỡng Chế Qua Linux Procfs Inode** | Khi khởi động lại server trên Termux, lệnh `pkill` thông thường có thể để lại socket treo. Cần quét inode trong `/proc/net/tcp` và gửi `SIGKILL` (`kill -9`) thẳng vào PID đang giữ port để triệt tiêu lỗi `Errno 98 address already in use`. |
 
 ---
 

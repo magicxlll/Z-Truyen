@@ -21,7 +21,9 @@
 | **BUG-012** | AkayTruyen Scraper | Lỗi thiếu ảnh bìa và metadata truyện từ nguồn AkayTruyen | ✅ Đã khắc phục | 2026-08-20 |
 | **BUG-013** | Storage Path / Author | File tải về lưu vào thư mục Tác giả thay vì Tên truyện | ✅ Đã khắc phục | 2026-08-20 |
 | **BUG-014** | Hotspot Connectivity | X3 báo lỗi kết nối khi bắt Wi-Fi Hotspot phát từ điện thoại Android | ✅ Đã khắc phục | 2026-08-22 |
+| **BUG-015** | 5G Hotspot Dynamic IP | Dải IP Hotspot Android biến đổi (`10.59.53.x`), Wi-Fi 6 / PMF chặn ESP32 | ✅ Đã khắc phục | 2026-08-22 |
 | **DEPLOY-001** | Môi trường Android | Cài đặt toàn bộ 26 packages (FastAPI, EbookLib, Zeroconf...) | 🟢 Hoàn tất 100% | 2026-08-19 |
+| **DEPLOY-002** | 5G Hotspot Pocket Host | Đã xác thực kết nối thật 100% giữa Xteink X3 (Crosspoint 1.6-rc) và 5G Hotspot | 🟢 Hoàn tất 100% | 2026-08-22 |
 | **RULE-001** | Firmware Integrity | Tuyệt đối tuân thủ 100% Stock Factory Firmware của Xteink X3 | 🟢 Tuân thủ 100% | 2026-08-19 |
 
 ---
@@ -271,7 +273,26 @@
   4. **Tắt VPN/AdGuard**: Tắt các app 1.1.1.1 WARP, AdGuard trên điện thoại khi kết nối X3.
   5. **Nâng cấp script `start-server.sh`**: Tự động phân loại và in ra đúng IP của Hotspot (`ap0`/`wlan1`) kèm bảng cảnh báo cấu hình trực quan.
 
-### 18. RULE-001: Nguyên Tắc Bất Di Bất Dịch — Giữ 100% Stock Factory Firmware
+### 18. BUG-015: Lỗi Nhận Diện Dải IP Hotspot Biến Đổi (10.x.x.x trên card `wlan2`) & Xung Đột Wi-Fi 6
+- **Môi trường**: Kiểm thử thực tế trên máy thật **Xteink X3 (Firmware Crosspoint 1.6-rc)** kết nối vào Smartphone Android 5G Hotspot độc lập (đã tắt Wi-Fi gia đình).
+- **Triệu chứng**: 
+  - Màn hình X3 báo `Tìm thấy 0 mạng` hoặc kẹt ở trạng thái `Đang kết nối tới mạng Wi-Fi đã lưu...`.
+  - Khi bấm vào nguồn OPDS `zhost` (`http://192.168.43.1:8080/opds`), màn hình báo: `Lỗi: Không tải được nguồn cấp`.
+  - Trên Termux, server báo `[Errno 98] address already in use` khi khởi động lại.
+- **Nguyên nhân gốc rễ (Root Cause)**:
+  1. **Dải IP Hotspot động của nhà sản xuất (OEM Dynamic Subnet)**: Trên một số dòng máy Android 5G đời mới (Oppo, Realme, OnePlus, Vivo), Android không dùng dải `192.168.43.1` mà gán interface SoftAP `wlan2` địa chỉ IP động là **`10.59.53.37`** (cấp IP cho máy X3 là `10.59.53.73`). Khi X3 gọi vào `192.168.43.1` sẽ không bao giờ tìm thấy server.
+  2. **Xung đột Chuẩn Wi-Fi 6 (802.11ax) & PMF**: Mặc định phát Wi-Fi 6 khiến chip Wi-Fi ESP32 của X3 không quét thấy sóng (`Tìm thấy 0 mạng`).
+  3. **Tiến trình cũ chiếm dụng Socket Port 8080**: Khi `pkill` thông thường không ngắt hoàn toàn socket, Uvicorn bị lỗi Errno 98.
+- **Giải pháp & Đã Khắc Phục Triệt Để**:
+  1. **Nâng cấp `start-server.sh` & `mdns.py`**: Nhận diện thông minh toàn bộ interface mạng không dây cục bộ (`wlan*`, `ap*`, `swlan*`, `softap*`) kể cả khi mang dải `10.x.x.x` để in ra đúng địa chỉ Gateway (ví dụ `http://10.59.53.37:8080/opds`).
+  2. **Tự động giải phóng cổng 8080 (`/proc/net/tcp` inode + SIGKILL)**: Quét socket inode trực tiếp từ nhân Linux và gửi `kill -9` giải phóng cổng 8080 tức thì trong 0.1s.
+  3. **Tạo 2 công cụ chẩn đoán chuyên sâu**:
+     - `ztruyen-debug` (`android/debug_network.py`): Quét toàn bộ card mạng, ARP table, listening port và kiểm tra độ phản hồi HTTP.
+     - `ztruyen-monitor` (`android/monitor_hotspot.py`): Giám sát thời gian thực theo địa chỉ MAC máy X3 (`f8:5b:1b:fc:3f:a0`), tự động phát hiện khi X3 kết nối và in ra URL OPDS chính xác.
+  4. **Cấu hình chuẩn trên điện thoại**: Tắt "Chuẩn Wi-Fi 6", chọn "WPA2-Personal", tắt "Tăng tốc phần cứng chia sẻ kết nối" (Tethering hardware acceleration).
+- **Kết quả thực tế**: Máy đọc sách Xteink X3 (Crosspoint 1.6-rc) kết nối thành công 100% qua `http://10.59.53.37:8080/opds`, duyệt kho truyện và tải sách mượt mà qua mạng 5G di động!
+
+### 19. RULE-001: Nguyên Tắc Bất Di Bất Dịch — Giữ 100% Stock Factory Firmware
 - **Quy tắc**: Tuyệt đối **KHÔNG** chỉnh sửa hoặc can thiệp vào mã nguồn firmware gốc của CrossPoint Reader / Xteink X3 để đạt được mục đích.
 - **Lý do**: Máy đọc sách Xteink X3 vật lý ngoài đời chạy firmware gốc xuất xưởng của nhà sản xuất (hoặc bản flash release chính thức). Người dùng không thể và không nên tùy tiện flash custom firmware vì rủi ro brick máy cao.
 - **Giải pháp chuẩn**: Mọi tính năng (danh sách chương, tiếp tục đọc, phân loại danh mục, ảnh bìa, gom tập KOSync) phải được hiện thực hoàn toàn 100% phía **Backend Server OPDS** theo đúng đặc tả Atom / OPDS 1.2 RFC.
