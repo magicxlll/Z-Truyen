@@ -14,7 +14,12 @@ cd "$PROJECT_ROOT"
 # Tắt kiểm tra filemode của git để chống xung đột quyền file vĩnh viễn
 git config core.filemode false 2>/dev/null || true
 
-# Đăng ký các alias tiện ích nếu chưa có
+# Đồng bộ cứng với origin/main, tự động xóa sạch file rác/file tạm
+git fetch origin main --quiet
+git reset --hard origin/main
+chmod +x "$DIR"/*.sh 2>/dev/null || true
+
+# Đăng ký các alias tiện ích và symlink vào $PREFIX/bin
 DEBUG_SCRIPT="$DIR/debug-network.sh"
 START_SCRIPT="$DIR/start-server.sh"
 UPDATE_SCRIPT="$DIR/update.sh"
@@ -26,6 +31,13 @@ sed -i '/alias ztruyen-debug=/d' ~/.bashrc 2>/dev/null || true
 echo "alias ztruyen='bash $START_SCRIPT'" >> ~/.bashrc
 echo "alias ztruyen-update='bash $UPDATE_SCRIPT'" >> ~/.bashrc
 echo "alias ztruyen-debug='bash $DEBUG_SCRIPT'" >> ~/.bashrc
+
+# Tạo symlink vào $PREFIX/bin để gọi lệnh trực tiếp không phụ thuộc vào bashrc
+if [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
+    ln -sf "$START_SCRIPT" "$PREFIX/bin/ztruyen" 2>/dev/null || true
+    ln -sf "$UPDATE_SCRIPT" "$PREFIX/bin/ztruyen-update" 2>/dev/null || true
+    ln -sf "$DEBUG_SCRIPT" "$PREFIX/bin/ztruyen-debug" 2>/dev/null || true
+fi
 
 echo ""
 echo "[OK] Cập nhật thành công! Đang khởi chạy Server..."

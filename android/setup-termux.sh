@@ -51,6 +51,13 @@ echo "alias ztruyen='bash $START_SCRIPT'" >> ~/.bashrc
 echo "alias ztruyen-update='bash $UPDATE_SCRIPT'" >> ~/.bashrc
 echo "alias ztruyen-debug='bash $DEBUG_SCRIPT'" >> ~/.bashrc
 
+# Tạo symlink vào $PREFIX/bin để gọi lệnh trực tiếp không phụ thuộc vào bashrc
+if [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
+    ln -sf "$START_SCRIPT" "$PREFIX/bin/ztruyen" 2>/dev/null || true
+    ln -sf "$UPDATE_SCRIPT" "$PREFIX/bin/ztruyen-update" 2>/dev/null || true
+    ln -sf "$DEBUG_SCRIPT" "$PREFIX/bin/ztruyen-debug" 2>/dev/null || true
+fi
+
 echo ""
 echo "======================================================================"
 echo "🎉 CÀI ĐẶT HOÀN TẤT!"
