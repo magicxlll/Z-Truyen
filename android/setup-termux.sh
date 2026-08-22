@@ -40,22 +40,26 @@ echo "[4/4] Đang tạo phím tắt lệnh 'ztruyen', 'ztruyen-update', 'ztruyen
 START_SCRIPT="$DIR/start-server.sh"
 UPDATE_SCRIPT="$DIR/update.sh"
 DEBUG_SCRIPT="$DIR/debug-network.sh"
+MONITOR_SCRIPT="$DIR/monitor-hotspot.sh"
 chmod +x "$DIR"/*.sh 2>/dev/null || true
 
 # Xóa alias cũ nếu có và tạo alias mới chuẩn xác
 sed -i '/alias ztruyen=/d' ~/.bashrc 2>/dev/null || true
 sed -i '/alias ztruyen-update=/d' ~/.bashrc 2>/dev/null || true
 sed -i '/alias ztruyen-debug=/d' ~/.bashrc 2>/dev/null || true
+sed -i '/alias ztruyen-monitor=/d' ~/.bashrc 2>/dev/null || true
 
 echo "alias ztruyen='bash $START_SCRIPT'" >> ~/.bashrc
 echo "alias ztruyen-update='bash $UPDATE_SCRIPT'" >> ~/.bashrc
 echo "alias ztruyen-debug='bash $DEBUG_SCRIPT'" >> ~/.bashrc
+echo "alias ztruyen-monitor='bash $MONITOR_SCRIPT'" >> ~/.bashrc
 
 # Tạo symlink vào $PREFIX/bin để gọi lệnh trực tiếp không phụ thuộc vào bashrc
 if [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
     ln -sf "$START_SCRIPT" "$PREFIX/bin/ztruyen" 2>/dev/null || true
     ln -sf "$UPDATE_SCRIPT" "$PREFIX/bin/ztruyen-update" 2>/dev/null || true
     ln -sf "$DEBUG_SCRIPT" "$PREFIX/bin/ztruyen-debug" 2>/dev/null || true
+    ln -sf "$MONITOR_SCRIPT" "$PREFIX/bin/ztruyen-monitor" 2>/dev/null || true
 fi
 
 echo ""
