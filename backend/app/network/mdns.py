@@ -47,7 +47,24 @@ def get_local_ip_addresses() -> list[str]:
     except Exception:
         pass
 
-    # 2. Fallback to hostname resolution if no cellular
+    # 2. Try parsing ARP table for connected hotspot devices
+    try:
+        import os
+        if os.path.exists('/proc/net/arp'):
+            with open('/proc/net/arp', 'r') as f:
+                for line in f.readlines()[1:]:
+                    parts = line.strip().split()
+                    if len(parts) >= 6 and parts[2] == '0x2':
+                        client_ip = parts[0]
+                        if client_ip.startswith('192.168.') or client_ip.startswith('172.'):
+                            prefix = '.'.join(client_ip.split('.')[:3])
+                            gw = f'{prefix}.1'
+                            if gw not in ip_list:
+                                ip_list.append(gw)
+    except Exception:
+        pass
+
+    # 3. Fallback to hostname resolution if no cellular
     try:
         hostname = socket.gethostname()
         for ip in socket.gethostbyname_ex(hostname)[2]:

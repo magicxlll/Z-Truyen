@@ -34,19 +34,22 @@ pip install -r "$DIR/requirements-termux.txt"
 # Tắt kiểm tra filemode của git để chống xung đột quyền file
 git config core.filemode false 2>/dev/null || true
 
-# 4. Tạo alias 'ztruyen' và 'ztruyen-update' để khởi động và cập nhật nhanh
+# 4. Tạo alias 'ztruyen', 'ztruyen-update', và 'ztruyen-debug'
 echo ""
-echo "[4/4] Đang tạo phím tắt lệnh 'ztruyen' và 'ztruyen-update'..."
+echo "[4/4] Đang tạo phím tắt lệnh 'ztruyen', 'ztruyen-update', 'ztruyen-debug'..."
 START_SCRIPT="$DIR/start-server.sh"
 UPDATE_SCRIPT="$DIR/update.sh"
+DEBUG_SCRIPT="$DIR/debug-network.sh"
 chmod +x "$DIR"/*.sh 2>/dev/null || true
 
 # Xóa alias cũ nếu có và tạo alias mới chuẩn xác
 sed -i '/alias ztruyen=/d' ~/.bashrc 2>/dev/null || true
 sed -i '/alias ztruyen-update=/d' ~/.bashrc 2>/dev/null || true
+sed -i '/alias ztruyen-debug=/d' ~/.bashrc 2>/dev/null || true
 
 echo "alias ztruyen='bash $START_SCRIPT'" >> ~/.bashrc
 echo "alias ztruyen-update='bash $UPDATE_SCRIPT'" >> ~/.bashrc
+echo "alias ztruyen-debug='bash $DEBUG_SCRIPT'" >> ~/.bashrc
 
 echo ""
 echo "======================================================================"
